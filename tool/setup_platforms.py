@@ -90,6 +90,8 @@ def patch_gradle_kts(path):
         if n == 0:
             fail("compileOptions غير موجود في build.gradle.kts")
     s = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = maxOf(flutter.minSdkVersion, 24)", s)
+    # flutter_local_notifications و androidx.core الحديثة تتطلب compileSdk 37
+    s = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = maxOf(flutter.compileSdkVersion, 37)", s)
     if "multiDexEnabled" not in s:
         s = re.sub(r"(defaultConfig\s*\{)", r"\1\n        multiDexEnabled = true", s, count=1)
     if "keystoreProperties" not in s:
@@ -143,6 +145,7 @@ def patch_gradle_groovy(path):
     if "coreLibraryDesugaringEnabled" not in s:
         s = re.sub(r"compileOptions\s*\{", "compileOptions {\n        coreLibraryDesugaringEnabled true", s, count=1)
     s = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdkVersion Math.max(flutter.minSdkVersion, 24)", s)
+    s = re.sub(r"compileSdk(Version)?\s*=?\s*flutter\.compileSdkVersion", "compileSdkVersion Math.max(flutter.compileSdkVersion, 37)", s)
     if "keystoreProperties" not in s:
         s = re.sub(
             r"(\nandroid\s*\{)",
