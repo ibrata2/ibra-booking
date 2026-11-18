@@ -1,0 +1,9 @@
+analyzer:
+  exclude:
+    - build/**
+    - packages/**
+    - platform/**
+    - android/**
+    - ios/**
+  errors:
+    deprecated_member_use: ignore

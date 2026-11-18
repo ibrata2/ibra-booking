@@ -1,0 +1,21 @@
+name: ibra_native
+description: "تكاملات أصلية لتطبيق IBRA BOOKING: تحويل وقص الأصوات، تسجيل أصوات التنبيه، المنطقة الزمنية، والمعاينة."
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.8.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.ibraprogram.ibra_native
+        pluginClass: IbraNativePlugin
+      ios:
+        pluginClass: IbraNativePlugin

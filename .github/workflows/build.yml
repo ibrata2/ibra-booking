@@ -1,0 +1,163 @@
+name: Build IBRA BOOKING
+
+# يبني نسخ أندرويد (APK + AAB) و iOS (IPA غير موقع + مشروع Xcode)
+# وينشرها تلقائياً في صفحة Releases عند كل رفع إلى main.
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP: IBRA-BOOKING
+
+jobs:
+  android:
+    name: Android (APK + AAB)
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: قراءة رقم الإصدار
+        id: ver
+        run: |
+          echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter --version
+
+      - name: إنشاء مجلدات المنصات
+        run: flutter create --org com.ibraprogram --project-name ibra_booking --platforms android,ios .
+
+      - name: تجهيز المنصات والأيقونات
+        run: |
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+          python3 tool/setup_platforms.py
+
+      - run: flutter pub get
+
+      - name: الفحص
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: الاختبارات
+        run: flutter test
+
+      - name: توقيع الإصدار (اختياري)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        if: env.HAS_KEYSTORE == 'true'
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: بناء APK
+        run: |
+          flutter build apk --release
+          flutter build apk --release --split-per-abi
+
+      - name: بناء AAB
+        run: flutter build appbundle --release
+
+      - name: تجميع الملفات
+        run: |
+          V=${{ steps.ver.outputs.version }}
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk out/$APP-$V-android-universal.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk out/$APP-$V-android-arm64.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk out/$APP-$V-android-arm32.apk
+          cp build/app/outputs/bundle/release/app-release.aab out/$APP-$V-android.aab
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/*
+
+  ios:
+    name: iOS (IPA + Xcode)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: إنشاء مجلدات المنصات
+        run: flutter create --org com.ibraprogram --project-name ibra_booking --platforms android,ios .
+
+      - name: تجهيز المنصات والأيقونات
+        run: |
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+          python3 tool/setup_platforms.py
+
+      - run: flutter pub get
+
+      - name: بناء iOS بدون توقيع
+        run: flutter build ios --release --no-codesign
+
+      - name: تجميع IPA ومشروع Xcode
+        run: |
+          V=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          mkdir -p out Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry out/$APP-$V-ios-unsigned.ipa Payload
+          # مشروع Flutter كامل مع مجلد ios جاهز للفتح في Xcode (Runner.xcworkspace)
+          zip -qry out/$APP-$V-ios-xcode-project.zip . -x "build/*" ".dart_tool/*" "out/*" "Payload/*" ".git/*" "android/.gradle/*" "ios/Pods/*" "ios/.symlinks/*"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: out/*
+
+  release:
+    name: نشر الإصدار
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.android.outputs.version }}
+          name: IBRA BOOKING v${{ needs.android.outputs.version }} — حجوزات IBRA
+          body: |
+            ## حجوزات IBRA — IBRA BOOKING v${{ needs.android.outputs.version }}
+
+            - **أندرويد:** `android-universal.apk` يعمل على كل الأجهزة (أو `arm64` للأجهزة الحديثة بحجم أصغر).
+            - **Google Play:** ملف `android.aab`.
+            - **آيفون:** `ios-unsigned.ipa` (يحتاج توقيع عبر Sideloadly / AltStore أو حساب مطور)، و `ios-xcode-project.zip` للبناء من Xcode.
+
+            برمجة وتطوير ابراهيم الخزرجي — https://ibraprogram.netlify.app/
+          files: dist/*
+          make_latest: true
