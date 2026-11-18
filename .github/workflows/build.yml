@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   APP: IBRA-BOOKING
 
@@ -38,6 +42,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - uses: subosito/flutter-action@v2
         with:
@@ -81,11 +86,15 @@ jobs:
 
       - name: بناء APK
         run: |
-          flutter build apk --release --dart-define=EDITION=${{ matrix.edition }}
-          flutter build apk --release --split-per-abi --dart-define=EDITION=${{ matrix.edition }}
+          # إعادة المحاولة عند ضغط خوادم Maven (429)
+          retry() { for n in 1 2 3 4; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
+          retry flutter build apk --release --dart-define=EDITION=${{ matrix.edition }}
+          retry flutter build apk --release --split-per-abi --dart-define=EDITION=${{ matrix.edition }}
 
       - name: بناء AAB
-        run: flutter build appbundle --release --dart-define=EDITION=${{ matrix.edition }}
+        run: |
+          retry() { for n in 1 2 3 4; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
+          retry flutter build appbundle --release --dart-define=EDITION=${{ matrix.edition }}
 
       - name: تجميع الملفات
         run: |
@@ -129,7 +138,9 @@ jobs:
       - run: flutter pub get
 
       - name: بناء iOS بدون توقيع
-        run: flutter build ios --release --no-codesign --dart-define=EDITION=${{ matrix.edition }}
+        run: |
+          retry() { for n in 1 2 3; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
+          retry flutter build ios --release --no-codesign --dart-define=EDITION=${{ matrix.edition }}
 
       - name: تجميع IPA ومشروع Xcode
         run: |
