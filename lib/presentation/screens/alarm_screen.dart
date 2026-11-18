@@ -12,6 +12,7 @@ import '../../services/sound_service.dart';
 import '../providers.dart';
 import '../widgets/common.dart';
 import 'appointment_details_screen.dart';
+import '../../core/edition.dart';
 
 /// شاشة المنبه: يستمر الرنين حتى يضغط المستخدم «استلمت».
 class AlarmScreen extends ConsumerStatefulWidget {
@@ -98,10 +99,7 @@ class _AlarmScreenState extends ConsumerState<AlarmScreen> with SingleTickerProv
                           BoxShadow(color: Brand.blue.withValues(alpha: 0.6), blurRadius: 40, offset: const Offset(10, 10)),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(40),
-                        child: Image.asset('assets/images/logo.png', width: 150, height: 150),
-                      ),
+                      child: ClipRRect(borderRadius: BorderRadius.circular(40), child: Image.asset(Edition.logo, width: 150, height: 150)),
                     ),
                   ),
                   const SizedBox(height: 28),

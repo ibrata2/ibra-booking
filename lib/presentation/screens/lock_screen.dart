@@ -8,6 +8,7 @@ import '../../core/security/sha256.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers.dart';
 import '../widgets/common.dart';
+import '../../core/edition.dart';
 
 /// لوحة أرقام PIN (تستخدم للقفل ولإعداد الرمز).
 class PinPad extends StatefulWidget {
@@ -163,7 +164,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.asset('assets/images/logo.png', width: 84, height: 84)),
+                  ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.asset(Edition.logo, width: 84, height: 84)),
                   const SizedBox(height: 10),
                   ShaderMask(
                     shaderCallback: (r) => const LinearGradient(colors: [Brand.red, Brand.blue]).createShader(r),

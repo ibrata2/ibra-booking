@@ -11,6 +11,7 @@ import '../widgets/common.dart';
 import 'appointment_details_screen.dart';
 import 'appointment_form_screen.dart';
 import 'notification_settings_screen.dart';
+import '../../core/edition.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -52,7 +53,7 @@ class HomeScreen extends ConsumerWidget {
           children: [
             Row(
               children: [
-                ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/images/logo.png', width: 42, height: 42)),
+                ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(Edition.logo, width: 42, height: 42)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

@@ -11,5 +11,6 @@ class Edition {
 
   static const String nameAr = isGeneral ? 'الحجوزات IBRA' : 'حجوزات IBRA';
   static const String nameEn = isGeneral ? 'IBRA Bookings' : 'IBRA BOOKING';
+  static const String logo = isGeneral ? 'assets/images/logo_general.png' : 'assets/images/logo.png';
   static String name(bool ar) => ar ? nameAr : nameEn;
 }

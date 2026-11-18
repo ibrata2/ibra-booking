@@ -75,7 +75,8 @@ def notification_crescent(size=512):
 
 def gen_assets(tile):
     logo = rounded(inner(tile, 0.0), 0.2)
-    save(logo, os.path.join(ROOT, "assets", "images", "logo.png"), 512)
+    name = "logo_general.png" if "--general" in sys.argv else "logo.png"
+    save(logo, os.path.join(ROOT, "assets", "images", name), 512)
     save(tile, os.path.join(ROOT, "dist_assets", "play_store_icon_512.png"), 512, "RGB")
 
 

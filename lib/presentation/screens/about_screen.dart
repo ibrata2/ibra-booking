@@ -37,7 +37,7 @@ class AboutScreen extends StatelessWidget {
           Glass(
             child: Column(
               children: [
-                ClipRRect(borderRadius: BorderRadius.circular(28), child: Image.asset('assets/images/logo.png', width: 110, height: 110)),
+                ClipRRect(borderRadius: BorderRadius.circular(28), child: Image.asset(Edition.logo, width: 110, height: 110)),
                 const SizedBox(height: 12),
                 ShaderMask(
                   shaderCallback: (r) => const LinearGradient(colors: [Brand.red, Brand.blue]).createShader(r),
