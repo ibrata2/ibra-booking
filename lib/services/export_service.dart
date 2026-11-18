@@ -11,6 +11,7 @@ import '../core/files/zip.dart';
 import '../core/l10n/tr.dart';
 import '../core/time/time_format.dart';
 import '../domain/entities/entities.dart';
+import '../core/edition.dart';
 
 /// صف في التقرير المالي.
 class ReportRow {
@@ -171,7 +172,7 @@ class ExportService {
         final header = Paint()
           ..shader = ui.Gradient.linear(const Offset(0, 0), const Offset(pw, 0), [const Color(0xFFD62839), const Color(0xFF2F6BFF)]);
         c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(margin, y, pw - margin * 2, 64), const Radius.circular(14)), header);
-        text('IBRA BOOKING', margin + 16, y + 10, pw - margin * 2 - 32, size: 18, weight: FontWeight.w800, color: const Color(0xFFFFFFFF));
+        text(Edition.nameEn, margin + 16, y + 10, pw - margin * 2 - 32, size: 18, weight: FontWeight.w800, color: const Color(0xFFFFFFFF));
         text(title, margin + 16, y + 36, pw - margin * 2 - 32, size: 11, color: const Color(0xFFFFFFFF));
         y += 80;
         final boxes = [

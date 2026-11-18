@@ -1,6 +1,7 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../../core/edition.dart';
 import '../../domain/entities/entities.dart';
 
 /// قاعدة البيانات المحلية (SQLite). كل ترقية مستقبلية تضاف في [_migrations]
@@ -175,7 +176,7 @@ class AppDatabase {
 
   static Future<void> _seed(Database db) async {
     final b = db.batch();
-    for (final c in EventCategory.defaults) {
+    for (final c in EventCategory.defaultsFor(Edition.isGeneral)) {
       b.insert('categories', c.toMap());
     }
     await b.commit(noResult: true);

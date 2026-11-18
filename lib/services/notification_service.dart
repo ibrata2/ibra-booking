@@ -15,6 +15,7 @@ import '../domain/entities/entities.dart';
 import '../domain/logic/scheduling.dart';
 import '../domain/repositories.dart';
 import 'sound_service.dart';
+import '../core/edition.dart';
 
 /// حمولة الإشعار (تمر مع الضغط عليه أو على أزراره).
 class AlarmPayload {
@@ -565,7 +566,7 @@ class NotificationService {
       phone: '',
       categoryId: cats.isEmpty ? null : cats.first.id,
       placeName: Tr.t('test_place', ar: settings.isArabic),
-      address: 'IBRA BOOKING',
+      address: Edition.nameEn,
       start: now.add(delay).add(const Duration(minutes: 60)),
       end: now.add(delay).add(const Duration(minutes: 180)),
       soundKey: soundKey,

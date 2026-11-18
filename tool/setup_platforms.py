@@ -18,6 +18,12 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OVERLAY = os.path.join(ROOT, "platform")
 PACKAGE = "com.ibraprogram.ibra_booking"
+EDITION = "general" if "--edition=general" in sys.argv or ("--edition" in sys.argv and sys.argv[sys.argv.index("--edition") + 1] == "general") else "events"
+GENERAL = EDITION == "general"
+# النسخة العامة تُثبَّت بجانب نسخة الفواتح بمعرف مختلف
+APP_ID = "com.ibraprogram.ibra_bookings" if GENERAL else PACKAGE
+NAME_AR = "الحجوزات IBRA" if GENERAL else "حجوزات IBRA"
+NAME_EN = "IBRA Bookings" if GENERAL else "IBRA BOOKING"
 
 
 def fail(msg):
@@ -40,6 +46,10 @@ def setup_android():
     if not os.path.isdir(android):
         fail("android/ غير موجود — شغل flutter create أولاً")
     copy_tree(os.path.join(OVERLAY, "android"), android)
+    res_main = os.path.join(android, "app", "src", "main", "res")
+    for folder, name in (("values", NAME_EN), ("values-ar", NAME_AR)):
+        with open(os.path.join(res_main, folder, "strings.xml"), "w") as f:
+            f.write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">%s</string>\n</resources>\n' % name)
 
     res = os.path.join(android, "app", "src", "main", "res")
     raw = os.path.join(res, "raw")
@@ -64,6 +74,12 @@ def setup_android():
             "class MainActivity : FlutterFragmentActivity()\n"
         )
 
+    for g in ("build.gradle.kts", "build.gradle"):
+        gp = os.path.join(android, "app", g)
+        if os.path.exists(gp):
+            t = open(gp).read()
+            t = re.sub(r'applicationId(\s*=\s*|\s+)"[^"]+"', lambda m: 'applicationId' + m.group(1) + '"' + APP_ID + '"', t)
+            open(gp, "w").write(t)
     gradle_kts = os.path.join(android, "app", "build.gradle.kts")
     gradle = os.path.join(android, "app", "build.gradle")
     if os.path.exists(gradle_kts):
@@ -80,7 +96,7 @@ def setup_android():
     if "android.useAndroidX" not in text:
         text += "android.useAndroidX=true\n"
     open(props, "w").write(text)
-    print("✓ Android")
+    print("✓ Android (%s → %s)" % (EDITION, APP_ID))
 
 
 def patch_gradle_kts(path):
@@ -179,8 +195,8 @@ def setup_ios():
     plist_path = os.path.join(ios, "Runner", "Info.plist")
     with open(plist_path, "rb") as f:
         pl = plistlib.load(f)
-    pl["CFBundleDisplayName"] = "حجوزات IBRA"
-    pl["CFBundleName"] = "IBRA BOOKING"
+    pl["CFBundleDisplayName"] = NAME_AR
+    pl["CFBundleName"] = NAME_EN
     pl["CFBundleDevelopmentRegion"] = "ar"
     pl["CFBundleLocalizations"] = ["ar", "en"]
     pl["NSMicrophoneUsageDescription"] = "لتسجيل صوت تنبيه شخصي — To record a personal alert sound"
@@ -202,6 +218,13 @@ def setup_ios():
         )
         open(sb, "w").write(s)
 
+    if GENERAL:
+        pbx = os.path.join(ios, "Runner.xcodeproj", "project.pbxproj")
+        if os.path.exists(pbx):
+            t = open(pbx).read()
+            t = re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.)ibraBooking\b", r"\1ibraBookings", t)
+            open(pbx, "w").write(t)
+
     podfile = os.path.join(ios, "Podfile")
     if os.path.exists(podfile):
         s = open(podfile).read()
@@ -213,5 +236,8 @@ def setup_ios():
 if __name__ == "__main__":
     setup_android()
     setup_ios()
-    subprocess.check_call([sys.executable, os.path.join(ROOT, "tool", "generate_icons.py"), "--platforms"])
+    icon_args = [sys.executable, os.path.join(ROOT, "tool", "generate_icons.py"), "--platforms"]
+    if GENERAL and os.path.exists(os.path.join(ROOT, "assets", "icon", "source_general.png")):
+        icon_args.append("--general")
+    subprocess.check_call(icon_args)
     print("تم تجهيز المنصات ✔")

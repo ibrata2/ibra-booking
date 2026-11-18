@@ -16,6 +16,7 @@ import 'presentation/screens/lock_screen.dart';
 import 'presentation/widgets/common.dart';
 import 'services/launcher_service.dart';
 import 'services/notification_service.dart';
+import 'core/edition.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -144,7 +145,7 @@ class _IbraBookingAppState extends ConsumerState<IbraBookingApp> with WidgetsBin
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'IBRA BOOKING',
+      title: Edition.nameEn,
       onGenerateTitle: (c) => c.t('app_name'),
       locale: Locale(s.language),
       supportedLocales: const [Locale('ar'), Locale('en')],

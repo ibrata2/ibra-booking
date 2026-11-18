@@ -106,7 +106,7 @@ class EventCategory {
     isDefault: (m['is_default'] as int?) == 1,
   );
 
-  static const defaults = <EventCategory>[
+  static const eventsDefaults = <EventCategory>[
     EventCategory(nameAr: 'الفواتح', nameEn: 'Fatiha', color: 0xFF9E9E9E, icon: 'mosque', sort: 0, isDefault: true),
     EventCategory(nameAr: 'مجالس العزاء', nameEn: 'Condolences', color: 0xFFE53935, icon: 'heart', sort: 1, isDefault: true),
     EventCategory(nameAr: 'المواليد', nameEn: 'Births', color: 0xFF43A047, icon: 'baby', sort: 2, isDefault: true),
@@ -115,6 +115,19 @@ class EventCategory {
     EventCategory(nameAr: 'المناسبات الخاصة', nameEn: 'Private events', color: 0xFF8E24AA, icon: 'star', sort: 5, isDefault: true),
     EventCategory(nameAr: 'مناسبات أخرى', nameEn: 'Other events', color: 0xFFFB8C00, icon: 'event', sort: 6, isDefault: true),
   ];
+
+  static const generalDefaults = <EventCategory>[
+    EventCategory(nameAr: 'موعد عمل', nameEn: 'Work appointment', color: 0xFF1E88E5, icon: 'work', sort: 0, isDefault: true),
+    EventCategory(nameAr: 'اجتماع', nameEn: 'Meeting', color: 0xFF8E24AA, icon: 'group', sort: 1, isDefault: true),
+    EventCategory(nameAr: 'زيارة عميل', nameEn: 'Client visit', color: 0xFF43A047, icon: 'home', sort: 2, isDefault: true),
+    EventCategory(nameAr: 'جلسة / خدمة', nameEn: 'Session / service', color: 0xFFEC407A, icon: 'star', sort: 3, isDefault: true),
+    EventCategory(nameAr: 'توصيل / مشوار', nameEn: 'Delivery / trip', color: 0xFFFB8C00, icon: 'car', sort: 4, isDefault: true),
+    EventCategory(nameAr: 'مناسبة', nameEn: 'Event', color: 0xFF00ACC1, icon: 'celebration', sort: 5, isDefault: true),
+    EventCategory(nameAr: 'شخصي', nameEn: 'Personal', color: 0xFF9E9E9E, icon: 'event', sort: 6, isDefault: true),
+    EventCategory(nameAr: 'أخرى', nameEn: 'Other', color: 0xFF6D4C41, icon: 'event', sort: 7, isDefault: true),
+  ];
+
+  static List<EventCategory> defaultsFor(bool general) => general ? generalDefaults : eventsDefaults;
 }
 
 /// صوت تنبيه. الأصوات المدمجة لها key يبدأ بـ app_ ، والمخصصة مخزنة في قاعدة البيانات.

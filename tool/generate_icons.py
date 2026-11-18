@@ -15,7 +15,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "assets", "icon", "source.png")
+SRC = os.path.join(ROOT, "assets", "icon", "source_general.png" if "--general" in sys.argv else "source.png")
 BG = (11, 16, 38)  # كحلي داكن للخلفيات
 
 

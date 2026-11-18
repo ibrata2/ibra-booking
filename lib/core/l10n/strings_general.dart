@@ -1,0 +1,30 @@
+/// نصوص خاصة بالنسخة العامة «الحجوزات IBRA» (تتقدم على kStrings).
+const Map<String, List<String>> kGeneralStrings = {
+  'app_name': ['الحجوزات IBRA', 'IBRA Bookings'],
+  'about_desc': [
+    'مدير حجوزات ومواعيد شخصي لأي شخص لديه عمل: مواعيد العملاء، الاجتماعات، الزيارات، الجلسات والخدمات. يعمل بالكامل دون إنترنت.',
+    'A personal booking and appointment manager for anyone with work: client appointments, meetings, visits, sessions and services. Works fully offline.',
+  ],
+  'event_type': ['نوع الموعد', 'Appointment type'],
+  'event_date': ['تاريخ الموعد', 'Appointment date'],
+  'categories': ['أنواع المواعيد', 'Appointment types'],
+  'customer': ['العميل', 'Client'],
+  'customers': ['العملاء', 'Clients'],
+  'customer_name': ['اسم العميل', 'Client name'],
+  'nav_customers': ['العملاء', 'Clients'],
+  'add_customer': ['إضافة عميل', 'Add client'],
+  'edit_customer': ['تعديل العميل', 'Edit client'],
+  'search_customers': ['ابحث عن عميل…', 'Search clients…'],
+  'no_customers': [
+    'لا يوجد عملاء بعد — يُنشأ سجل العميل تلقائياً مع أول حجز',
+    'No clients yet — a record is created automatically with the first booking',
+  ],
+  'delete_customer': ['حذف العميل', 'Delete client'],
+  'delete_customer_msg': ['سيتم حذف سجل العميل فقط وتبقى حجوزاته محفوظة.', 'Only the client record is deleted; bookings are kept.'],
+  'imported_n': ['تم استيراد {n} عميل', 'Imported {n} clients'],
+  'past_events': ['سجل المواعيد السابقة', 'Past appointments'],
+  'test_customer': ['عميل تجريبي', 'Test client'],
+  'test_place': ['مكان العمل', 'Workplace'],
+  'channel_desc': ['تنبيهات الحجوزات IBRA', 'IBRA Bookings reminders'],
+  'unlock_reason': ['افتح الحجوزات IBRA', 'Unlock IBRA Bookings'],
+};

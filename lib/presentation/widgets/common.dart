@@ -187,6 +187,13 @@ const Map<String, IconData> kCategoryIcons = {
   'candle': Icons.light_rounded,
   'school': Icons.school_rounded,
   'celebration': Icons.celebration_rounded,
+  'work': Icons.work_rounded,
+  'car': Icons.directions_car_rounded,
+  'camera': Icons.photo_camera_rounded,
+  'health': Icons.medical_services_rounded,
+  'tools': Icons.build_rounded,
+  'phone': Icons.phone_in_talk_rounded,
+  'coffee': Icons.local_cafe_rounded,
 };
 
 IconData categoryIcon(String key) => kCategoryIcons[key] ?? Icons.event_rounded;

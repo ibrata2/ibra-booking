@@ -4,6 +4,7 @@ import '../../core/l10n/tr.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/launcher_service.dart';
 import '../widgets/common.dart';
+import '../../core/edition.dart';
 
 /// حول التطبيق.
 class AboutScreen extends StatelessWidget {
@@ -41,11 +42,11 @@ class AboutScreen extends StatelessWidget {
                 ShaderMask(
                   shaderCallback: (r) => const LinearGradient(colors: [Brand.red, Brand.blue]).createShader(r),
                   child: const Text(
-                    'IBRA BOOKING',
+                    Edition.nameEn,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
                 ),
-                const Text('حجوزات IBRA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const Text(Edition.nameAr, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text('${context.t('version')} $version', style: TextStyle(color: Theme.of(context).hintColor)),
                 const SizedBox(height: 10),
