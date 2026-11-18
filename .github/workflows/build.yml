@@ -114,13 +114,17 @@ jobs:
 
   ios:
     name: iOS ${{ matrix.edition }}
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        edition: [events, general]
+        include:
+          - edition: events
+            runner: macos-latest
+          # جهاز Mac مختلف لتفادي زحمة أجهزة arm64 عند GitHub
+          - edition: general
+            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v5
 
