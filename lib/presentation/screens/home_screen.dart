@@ -12,6 +12,7 @@ import 'appointment_details_screen.dart';
 import 'appointment_form_screen.dart';
 import 'notification_settings_screen.dart';
 import '../../core/edition.dart';
+import 'staff_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -27,7 +28,10 @@ class HomeScreen extends ConsumerWidget {
     final perm = ref.watch(permissionStatusProvider).value;
     EventCategory? cat(Appointment a) => cats.where((c) => c.id == a.categoryId).firstOrNull;
 
-    final active = appts.where((a) => a.status != BookingStatus.cancelled).toList();
+    final staffList = Edition.isCenter ? (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.active).toList() : const <Staff>[];
+    final services = Edition.isCenter ? (ref.watch(servicesProvider).value ?? const <ServiceItem>[]) : const <ServiceItem>[];
+    final staffSel = Edition.isCenter ? ref.watch(staffFilterProvider) : null;
+    final active = appts.where((a) => a.status != BookingStatus.cancelled && (staffSel == null || a.staffId == staffSel)).toList();
     final todayStart = TimeFmt.dayStart(now);
     final tomorrow = todayStart.add(const Duration(days: 1));
     final dayAfter = todayStart.add(const Duration(days: 2));
@@ -114,6 +118,38 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            if (Edition.isCenter && (staffList.isEmpty || services.isEmpty)) ...[
+              const SizedBox(height: 12),
+              Glass(
+                tint: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.t('center_setup_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(context.t('center_setup_msg')),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffScreen())),
+                          icon: Icon(staffList.isEmpty ? Icons.person_add_alt_1_rounded : Icons.check_circle_rounded),
+                          label: Text(context.t('staff')),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesScreen())),
+                          icon: Icon(services.isEmpty ? Icons.add_rounded : Icons.check_circle_rounded),
+                          label: Text(context.t('services')),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (Edition.isCenter && staffList.isNotEmpty) ...[const SizedBox(height: 8), StaffFilterBar(staff: staffList)],
             const SizedBox(height: 12),
             Row(
               children: [

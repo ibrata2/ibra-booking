@@ -1,5 +1,6 @@
 import '../entities/appointment.dart';
 import '../entities/reminder_config.dart';
+import '../entities/staff.dart';
 
 /// تعارض بين حجز جديد/معدّل وحجز موجود.
 class ConflictInfo {
@@ -24,10 +25,14 @@ class ConflictChecker {
     required Iterable<Appointment> existing,
     Set<int> ignoreIds = const {},
     Duration travel = Duration.zero,
+    bool perStaff = false,
+    int? staffId,
   }) {
     final out = <ConflictInfo>[];
     for (final o in existing) {
       if (o.id != null && ignoreIds.contains(o.id)) continue;
+      // في نسخة المركز: كل موظف له جدوله المستقل
+      if (perStaff && o.staffId != staffId) continue;
       if (o.status.isClosed) continue;
       final overlap = start.isBefore(o.end) && o.start.isBefore(end);
       if (overlap) {
@@ -85,6 +90,7 @@ class ReminderPlanner {
     required ReminderConfig defaults,
     required DateTime now,
     required DateTime horizon,
+    bool perStaff = false,
   }) {
     final active = appointments.where((a) => !a.status.isClosed && a.id != null).toList()..sort((a, b) => a.start.compareTo(b.start));
     final out = <PlannedReminder>[];
@@ -92,6 +98,7 @@ class ReminderPlanner {
     Appointment? ongoingAt(DateTime t, Appointment except) {
       for (final b in active) {
         if (b.id == except.id) continue;
+        if (perStaff && b.staffId != except.staffId) continue;
         if (b.isOngoingAt(t)) return b;
       }
       return null;
@@ -128,6 +135,37 @@ class ReminderPlanner {
       final r = x.fireAt.compareTo(y.fireAt);
       return r != 0 ? r : x.type.index.compareTo(y.type.index);
     });
+    return out;
+  }
+}
+
+/// يحسب الأوقات الفارغة لموظف في يوم معين ضمن ساعات دوامه (مثل Setmore).
+class SlotFinder {
+  SlotFinder._();
+
+  static List<DateTime> free({
+    required WorkHours hours,
+    required DateTime day,
+    required int durationMin,
+    required Iterable<Appointment> staffBookings,
+    int stepMin = 15,
+    DateTime? now,
+    Set<int> ignoreIds = const {},
+  }) {
+    final base = DateTime(day.year, day.month, day.day);
+    final busy = staffBookings.where((a) => !a.status.isClosed && !(a.id != null && ignoreIds.contains(a.id))).toList();
+    final out = <DateTime>[];
+    for (final span in hours.forDay(base.weekday)) {
+      // نبدأ من أول خانة مقربة لخطوة الحجز
+      var m = (span.start / stepMin).ceil() * stepMin;
+      for (; m + durationMin <= span.end; m += stepMin) {
+        final s = base.add(Duration(minutes: m));
+        final e = s.add(Duration(minutes: durationMin));
+        if (now != null && !s.isAfter(now)) continue;
+        final clash = busy.any((a) => s.isBefore(a.end) && a.start.isBefore(e));
+        if (!clash) out.add(s);
+      }
+    }
     return out;
   }
 }

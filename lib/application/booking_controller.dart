@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/edition.dart';
 import '../domain/entities/entities.dart';
 import '../domain/logic/scheduling.dart';
 import '../presentation/providers.dart';
@@ -13,10 +14,18 @@ class BookingController {
   NotificationService get _notif => ref.read(notificationServiceProvider);
 
   /// فحص التعارض قبل الحفظ.
-  Future<List<ConflictInfo>> conflicts(DateTime start, DateTime end, {Set<int> ignoreIds = const {}}) async {
+  Future<List<ConflictInfo>> conflicts(DateTime start, DateTime end, {Set<int> ignoreIds = const {}, int? staffId}) async {
     final all = await ref.read(appointmentRepoProvider).between(start.subtract(const Duration(days: 1)), end.add(const Duration(days: 1)));
     final travel = Duration(minutes: ref.read(settingsProvider).travelMinutes);
-    return ConflictChecker.find(start: start, end: end, existing: all, ignoreIds: ignoreIds, travel: travel);
+    return ConflictChecker.find(
+      start: start,
+      end: end,
+      existing: all,
+      ignoreIds: ignoreIds,
+      travel: Edition.isCenter ? Duration.zero : travel,
+      perStaff: Edition.isCenter,
+      staffId: staffId,
+    );
   }
 
   /// حفظ حجز (جديد أو تعديل)، مع إنشاء/تحديث سجل الزبون تلقائياً.
@@ -66,9 +75,11 @@ class BookingController {
   }
 
   /// نقل حجز لوقت جديد (السحب والإفلات) مع الحفاظ على المدة.
-  Future<void> move(Appointment a, DateTime newStart) async {
+  Future<void> move(Appointment a, DateTime newStart, {int? staffId, bool changeStaff = false}) async {
     final d = a.duration;
-    await ref.read(appointmentRepoProvider).save(a.copyWith(start: newStart, end: newStart.add(d), updatedAt: DateTime.now()));
+    var upd = a.copyWith(start: newStart, end: newStart.add(d), updatedAt: DateTime.now());
+    if (changeStaff) upd = staffId == null ? upd.copyWith(clearStaff: true) : upd.copyWith(staffId: staffId);
+    await ref.read(appointmentRepoProvider).save(upd);
     _bump();
     await rescheduleNotifications();
   }
@@ -77,8 +88,16 @@ class BookingController {
     final appts = await ref
         .read(appointmentRepoProvider)
         .between(DateTime.now().subtract(const Duration(days: 1)), DateTime.now().add(const Duration(days: 60)));
+    final s = ref.read(settingsProvider);
+    if (Edition.isCenter) {
+      final staff = await ref.read(staffRepoProvider).all();
+      final services = await ref.read(serviceRepoProvider).all();
+      _notif.staffNames = {for (final x in staff) x.id!: x.name};
+      _notif.serviceNames = {for (final x in services) x.id!: x.name};
+    }
+    final mine = Edition.isCenter && s.notifyStaffId != 0 ? appts.where((a) => a.staffId == s.notifyStaffId).toList() : appts;
     return _notif.rescheduleAll(
-      appointments: appts,
+      appointments: mine,
       settings: ref.read(settingsProvider),
       categories: await ref.read(categoryRepoProvider).all(),
       customSounds: await ref.read(soundRepoProvider).all(),

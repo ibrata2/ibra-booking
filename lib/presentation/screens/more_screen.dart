@@ -12,6 +12,8 @@ import 'notification_settings_screen.dart';
 import 'security_screen.dart';
 import 'settings_screen.dart';
 import 'sounds_screen.dart';
+import 'staff_screen.dart';
+import '../../core/edition.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -70,7 +72,11 @@ class MoreScreen extends ConsumerWidget {
             const NotificationSettingsScreen(),
           ),
           tile(Icons.library_music_rounded, const Color(0xFFEC407A), context.t('sounds'), context.t('sounds_sub'), const SoundsScreen()),
-          tile(Icons.category_rounded, const Color(0xFF7C4DFF), context.t('categories'), context.t('categories_sub'), const CategoriesScreen()),
+          if (Edition.isCenter) ...[
+            tile(Icons.badge_rounded, const Color(0xFF3D7BFF), context.t('staff'), context.t('staff_sub'), const StaffScreen()),
+            tile(Icons.spa_rounded, const Color(0xFFEC407A), context.t('services'), context.t('services_sub'), const ServicesScreen()),
+          ] else
+            tile(Icons.category_rounded, const Color(0xFF7C4DFF), context.t('categories'), context.t('categories_sub'), const CategoriesScreen()),
           tile(Icons.backup_rounded, const Color(0xFF00ACC1), context.t('backup'), context.t('backup_sub'), const BackupScreen()),
           tile(Icons.lock_rounded, const Color(0xFFE53935), context.t('security'), context.t('security_sub'), const SecurityScreen()),
           tile(Icons.settings_rounded, const Color(0xFF3D7BFF), context.t('settings'), context.t('settings_sub'), const SettingsScreen()),

@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [events, general]
+        edition: [events, general, center]
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     outputs:
@@ -100,6 +100,7 @@ jobs:
         run: |
           V=${{ steps.ver.outputs.version }}
           if [ "${{ matrix.edition }}" = "general" ]; then APP=IBRA-Bookings-General; fi
+          if [ "${{ matrix.edition }}" = "center" ]; then APP=IBRA-Center; fi
           mkdir -p out
           cp build/app/outputs/flutter-apk/app-release.apk out/$APP-$V-android-universal.apk
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk out/$APP-$V-android-arm64.apk
@@ -125,6 +126,8 @@ jobs:
           # جهاز Mac مختلف لتفادي زحمة أجهزة arm64 عند GitHub
           - edition: general
             runner: macos-15-intel
+          - edition: center
+            runner: macos-15
     steps:
       - uses: actions/checkout@v5
 
@@ -152,6 +155,7 @@ jobs:
         run: |
           V=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           if [ "${{ matrix.edition }}" = "general" ]; then APP=IBRA-Bookings-General; fi
+          if [ "${{ matrix.edition }}" = "center" ]; then APP=IBRA-Center; fi
           mkdir -p out Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -qry out/$APP-$V-ios-unsigned.ipa Payload
@@ -181,13 +185,16 @@ jobs:
           tag_name: v${{ needs.android.outputs.version }}
           name: IBRA BOOKING v${{ needs.android.outputs.version }} — حجوزات IBRA + الحجوزات IBRA
           body: |
-            ## نسختان من التطبيق
+            ## ثلاث نسخ من التطبيق
 
             ### 🌙 حجوزات IBRA — `IBRA-BOOKING-*`
             للعاملين في الفواتح ومجالس العزاء والمواليد والأفراح والمجالس الدينية.
 
+            ### 💇 مواعيد المركز IBRA — `IBRA-Center-*`
+            لمراكز التجميل والعيادات والصالونات (مثل Setmore): موظفون بساعات دوام، خدمات بمدد وأسعار، أوقات فارغة تلقائية، تقويم بعمود لكل موظف، وتذكير قبل 15 دقيقة.
+
             ### 💼 الحجوزات IBRA — `IBRA-Bookings-General-*`
-            نسخة عامة لأي شخص لديه عمل ومواعيد (عملاء، اجتماعات، زيارات، جلسات). تُثبَّت بجانب النسخة الأولى.
+            نسخة عامة لأي شخص لديه عمل ومواعيد (عملاء، اجتماعات، زيارات، جلسات). تُثبَّت بجانب النسخ الأخرى.
 
             **لكل نسخة:**
             - **أندرويد:** `android-universal.apk` لكل الأجهزة، أو `arm64` للأجهزة الحديثة بحجم أصغر.

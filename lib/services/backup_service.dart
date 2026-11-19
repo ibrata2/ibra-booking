@@ -17,6 +17,8 @@ class BackupService {
   static const tables = [
     'customers',
     'categories',
+    'staff',
+    'services',
     'recurring_appointments',
     'custom_sounds',
     'appointments',

@@ -21,6 +21,12 @@ enum BookingStatus {
 class Appointment {
   final int? id;
   final int? customerId;
+
+  /// الموظف المسؤول (نسخة المركز).
+  final int? staffId;
+
+  /// الخدمة المحجوزة (نسخة المركز).
+  final int? serviceId;
   final String customerName;
   final String phone;
   final String phone2;
@@ -50,6 +56,8 @@ class Appointment {
   const Appointment({
     this.id,
     this.customerId,
+    this.staffId,
+    this.serviceId,
     required this.customerName,
     this.phone = '',
     this.phone2 = '',
@@ -98,6 +106,10 @@ class Appointment {
     int? id,
     bool clearId = false,
     int? customerId,
+    int? staffId,
+    bool clearStaff = false,
+    int? serviceId,
+    bool clearService = false,
     String? customerName,
     String? phone,
     String? phone2,
@@ -129,6 +141,8 @@ class Appointment {
     return Appointment(
       id: clearId ? null : (id ?? this.id),
       customerId: customerId ?? this.customerId,
+      staffId: clearStaff ? null : (staffId ?? this.staffId),
+      serviceId: clearService ? null : (serviceId ?? this.serviceId),
       customerName: customerName ?? this.customerName,
       phone: phone ?? this.phone,
       phone2: phone2 ?? this.phone2,
@@ -158,6 +172,8 @@ class Appointment {
   Map<String, Object?> toMap() => {
     if (id != null) 'id': id,
     'customer_id': customerId,
+    'staff_id': staffId,
+    'service_id': serviceId,
     'customer_name': customerName,
     'phone': phone,
     'phone2': phone2,
@@ -188,6 +204,8 @@ class Appointment {
     return Appointment(
       id: m['id'] as int?,
       customerId: m['customer_id'] as int?,
+      staffId: m['staff_id'] as int?,
+      serviceId: m['service_id'] as int?,
       customerName: (m['customer_name'] as String?) ?? '',
       phone: (m['phone'] as String?) ?? '',
       phone2: (m['phone2'] as String?) ?? '',

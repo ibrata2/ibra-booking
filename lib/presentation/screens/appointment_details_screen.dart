@@ -16,6 +16,7 @@ import '../providers.dart';
 import '../widgets/common.dart';
 import '../widgets/sound_picker.dart';
 import 'appointment_form_screen.dart';
+import '../../core/edition.dart';
 
 final _paymentsProvider = FutureProvider.family<List<Payment>, int>((ref, id) async {
   ref.watch(dataVersionProvider);
@@ -139,6 +140,11 @@ class AppointmentDetailsScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
+                if (Edition.isCenter) ...[
+                  if (staffOf(ref, appt) case final st?)
+                    _InfoRow(icon: Icons.badge_rounded, text: '${context.t('staff_member')}: ${st.name}', color: Color(st.color)),
+                  if (serviceOf(ref, appt) case final sv?) _InfoRow(icon: Icons.spa_rounded, text: '${context.t('service')}: ${sv.name}', bold: true),
+                ],
                 _InfoRow(
                   icon: Icons.event_rounded,
                   text: TimeFmt.dateLong(appt.start, ar: ar),
@@ -734,3 +740,7 @@ class _ImageViewer extends StatelessWidget {
     body: InteractiveViewer(maxScale: 6, child: Center(child: Image.file(File(path)))),
   );
 }
+
+Staff? staffOf(WidgetRef ref, Appointment a) => (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.id == a.staffId).firstOrNull;
+ServiceItem? serviceOf(WidgetRef ref, Appointment a) =>
+    (ref.watch(servicesProvider).value ?? const <ServiceItem>[]).where((x) => x.id == a.serviceId).firstOrNull;

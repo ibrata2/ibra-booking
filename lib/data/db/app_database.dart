@@ -11,7 +11,7 @@ class AppDatabase {
   final Database db;
 
   static const fileName = 'ibra_booking.db';
-  static const version = 1;
+  static const version = 2;
 
   static Future<String> path() async => p.join(await getDatabasesPath(), fileName);
 
@@ -26,6 +26,7 @@ class AppDatabase {
         final b = db.batch();
         _createV1(b);
         await b.commit(noResult: true);
+        await _v2(db);
         await _seed(db);
       },
       onUpgrade: (db, from, to) async {
@@ -39,9 +40,42 @@ class AppDatabase {
   }
 
   /// ترقيات المخطط: رقم الإصدار -> دالة الترقية.
-  static final Map<int, Future<void> Function(Database)> _migrations = {
-    // 2: (db) async { await db.execute('ALTER TABLE appointments ADD COLUMN ...'); },
-  };
+  static final Map<int, Future<void> Function(Database)> _migrations = {2: _v2};
+
+  /// الإصدار 2: الموظفون والخدمات (نسخة المركز). يضيف أعمدة دون المساس بالحجوزات الحالية.
+  static Future<void> _v2(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS staff(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT '',
+        color INTEGER NOT NULL,
+        hours_json TEXT NOT NULL DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        sort INTEGER NOT NULL DEFAULT 0,
+        created_ms INTEGER NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS services(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        duration_min INTEGER NOT NULL DEFAULT 30,
+        price REAL NOT NULL DEFAULT 0,
+        color INTEGER NOT NULL,
+        staff_ids TEXT NOT NULL DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        sort INTEGER NOT NULL DEFAULT 0
+      )''');
+    final cols = (await db.rawQuery('PRAGMA table_info(appointments)')).map((r) => r['name']).toSet();
+    if (!cols.contains('staff_id')) {
+      await db.execute('ALTER TABLE appointments ADD COLUMN staff_id INTEGER REFERENCES staff(id) ON DELETE SET NULL');
+    }
+    if (!cols.contains('service_id')) {
+      await db.execute('ALTER TABLE appointments ADD COLUMN service_id INTEGER REFERENCES services(id) ON DELETE SET NULL');
+    }
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_appt_staff ON appointments(staff_id)');
+  }
 
   static void _createV1(Batch b) {
     b.execute('''
@@ -176,7 +210,7 @@ class AppDatabase {
 
   static Future<void> _seed(Database db) async {
     final b = db.batch();
-    for (final c in EventCategory.defaultsFor(Edition.isGeneral)) {
+    for (final c in EventCategory.defaultsFor(Edition.isBusiness)) {
       b.insert('categories', c.toMap());
     }
     await b.commit(noResult: true);

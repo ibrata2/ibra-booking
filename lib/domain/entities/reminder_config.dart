@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../core/edition.dart';
+
 /// أنواع التنبيهات. الترتيب ثابت لأنه يدخل في حساب رقم الإشعار.
 enum ReminderType {
   approachStart, // اقتراب بداية الحجز
@@ -37,7 +39,10 @@ class ReminderConfig {
     this.persistent = true,
   });
 
-  static const defaults = ReminderConfig();
+  /// نسخة المركز: تذكير قبل الموعد بـ 15 دقيقة وعند البداية.
+  static const defaults = Edition.isCenter
+      ? ReminderConfig(approachStartMin: 15, approachEnd: false, end: false, nextBooking: false)
+      : ReminderConfig();
 
   bool isEnabled(ReminderType t) => switch (t) {
     ReminderType.approachStart => approachStart,

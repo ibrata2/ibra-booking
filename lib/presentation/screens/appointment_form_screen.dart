@@ -16,6 +16,8 @@ import '../widgets/common.dart';
 import '../widgets/reminder_editor.dart';
 import '../widgets/sound_picker.dart';
 import 'categories_screen.dart';
+import '../../core/edition.dart';
+import 'staff_screen.dart';
 
 const kIraqProvinces = [
   'بغداد',
@@ -41,11 +43,12 @@ const kIraqProvinces = [
 
 /// إضافة / تعديل / نسخ حجز.
 class AppointmentFormScreen extends ConsumerStatefulWidget {
-  const AppointmentFormScreen({super.key, this.appointment, this.copyFrom, this.initialDate, this.customer});
+  const AppointmentFormScreen({super.key, this.appointment, this.copyFrom, this.initialDate, this.customer, this.initialStaffId});
   final Appointment? appointment;
   final Appointment? copyFrom;
   final DateTime? initialDate;
   final Customer? customer;
+  final int? initialStaffId;
 
   @override
   ConsumerState<AppointmentFormScreen> createState() => _AppointmentFormScreenState();
@@ -69,6 +72,8 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
   final _provinceFocus = FocusNode();
 
   int? _categoryId;
+  int? _staffId;
+  int? _serviceId;
   int? _customerId;
   BookingStatus _status = BookingStatus.confirmed;
   late DateTime _date;
@@ -105,6 +110,8 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
       _deposit.text = src.deposit == 0 ? '' : MoneyFmt.number(src.deposit).replaceAll(',', '');
       _notes.text = src.notes;
       _categoryId = src.categoryId;
+      _staffId = src.staffId;
+      _serviceId = src.serviceId;
       _customerId = src.customerId;
       _status = src.status;
       _reminder = src.reminderOverride;
@@ -120,6 +127,7 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
     } else {
       final base = widget.initialDate ?? now;
       _date = TimeFmt.dayStart(base);
+      _staffId = widget.initialStaffId;
       final h = widget.initialDate != null && widget.initialDate!.hour > 0 ? widget.initialDate!.hour : (now.hour + 1).clamp(0, 22);
       _startT = TimeOfDay(hour: h, minute: 0);
       _endT = TimeOfDay(hour: (h + 2) % 24, minute: 0);
@@ -163,6 +171,8 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
       phone: _phone.text.trim(),
       phone2: _phone2.text.trim(),
       categoryId: _categoryId,
+      staffId: _staffId,
+      serviceId: _serviceId,
       placeName: _place.text.trim(),
       province: _province.text.trim(),
       area: _area.text.trim(),
@@ -189,13 +199,30 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
     if (!_form.currentState!.validate()) return;
     final a = _build();
     final ctrl = ref.read(bookingControllerProvider);
+    if (Edition.isCenter) {
+      final staff = (ref.read(staffProvider).value ?? const <Staff>[]).where((x) => x.active).toList();
+      if (staff.isNotEmpty && _staffId == null) {
+        toast(context, context.t('staff_required'));
+        return;
+      }
+      final st = staff.where((x) => x.id == _staffId).firstOrNull;
+      if (st != null && !st.hours.covers(a.start, a.end)) {
+        final go = await confirmDialog(
+          context,
+          title: context.t('outside_hours_title'),
+          message: context.t('outside_hours_msg', {'name': st.name}),
+          ok: context.t('save_anyway'),
+        );
+        if (!go || !mounted) return;
+      }
+    }
     setState(() => _saving = true);
     try {
       // فحص التعارض لكل تكرار جديد أو للحجز نفسه
       final starts = !_editing && !_rule.isNone ? _rule.expand(a.start) : [a.start];
       final found = <ConflictInfo>[];
       for (final s in starts.take(60)) {
-        found.addAll(await ctrl.conflicts(s, s.add(a.duration), ignoreIds: {if (a.id != null) a.id!}));
+        found.addAll(await ctrl.conflicts(s, s.add(a.duration), ignoreIds: {if (a.id != null) a.id!}, staffId: _staffId));
       }
       if (found.isNotEmpty && mounted) {
         final go = await _conflictDialog(found);
@@ -309,6 +336,159 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
     });
   }
 
+  /// اختيار خدمة: يضبط المدة والسعر تلقائياً.
+  void _pickService(ServiceItem sv) {
+    final prevPrice = (ref.read(servicesProvider).value ?? const <ServiceItem>[]).where((x) => x.id == _serviceId).firstOrNull?.price;
+    setState(() {
+      _serviceId = sv.id;
+      final e = _start.add(Duration(minutes: sv.durationMin));
+      _endT = TimeOfDay(hour: e.hour, minute: e.minute);
+      if (_fee.text.trim().isEmpty || (prevPrice != null && _num(_fee) == prevPrice)) {
+        _fee.text = sv.price == 0 ? '' : MoneyFmt.number(sv.price).replaceAll(',', '');
+      }
+      final staff = (ref.read(staffProvider).value ?? const <Staff>[]).where((x) => x.active && sv.offeredBy(x.id)).toList();
+      if (_staffId != null && !sv.offeredBy(_staffId)) _staffId = null;
+      if (_staffId == null && staff.length == 1) _staffId = staff.first.id;
+    });
+  }
+
+  List<Widget> _centerSection(BuildContext context) {
+    final services = (ref.watch(servicesProvider).value ?? const <ServiceItem>[]).where((x) => x.active || x.id == _serviceId).toList();
+    final allStaff = (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.active || x.id == _staffId).toList();
+    final sv = services.where((x) => x.id == _serviceId).firstOrNull;
+    final staff = sv == null ? allStaff : allStaff.where((x) => sv.offeredBy(x.id) || x.id == _staffId).toList();
+    final sym = ref.watch(settingsProvider).currencySymbol;
+    return [
+      SectionTitle(
+        context.t('service'),
+        trailing: TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesScreen())),
+          icon: const Icon(Icons.tune_rounded, size: 18),
+          label: Text(context.t('manage')),
+        ),
+      ),
+      if (services.isEmpty)
+        Text(context.t('no_services_hint'), style: TextStyle(color: Theme.of(context).hintColor))
+      else
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final x in services)
+              ChoiceChip(
+                selected: _serviceId == x.id,
+                onSelected: (_) => _pickService(x),
+                avatar: CircleAvatar(backgroundColor: Color(x.color), radius: 7),
+                label: Text(
+                  '${x.name} • ${TimeFmt.human(Duration(minutes: x.durationMin), ar: context.ar)}${x.price > 0 ? ' • ${MoneyFmt.format(x.price, sym)}' : ''}',
+                ),
+                selectedColor: Color(x.color).withValues(alpha: 0.25),
+              ),
+          ],
+        ),
+      SectionTitle(
+        context.t('staff_member'),
+        trailing: TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffScreen())),
+          icon: const Icon(Icons.tune_rounded, size: 18),
+          label: Text(context.t('manage')),
+        ),
+      ),
+      if (allStaff.isEmpty)
+        Text(context.t('no_staff_hint'), style: TextStyle(color: Theme.of(context).hintColor))
+      else
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final x in staff)
+              ChoiceChip(
+                selected: _staffId == x.id,
+                onSelected: (_) => setState(() => _staffId = x.id),
+                avatar: CircleAvatar(
+                  backgroundColor: Color(x.color),
+                  child: Text(x.name.isEmpty ? '?' : x.name.characters.first, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                ),
+                label: Text(x.role.isEmpty ? x.name : '${x.name} — ${x.role}'),
+                selectedColor: Color(x.color).withValues(alpha: 0.25),
+              ),
+          ],
+        ),
+    ];
+  }
+
+  /// الأوقات الفارغة للموظف المختار ضمن دوامه (مثل Setmore).
+  Widget _slots(BuildContext context) {
+    final staff = (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.id == _staffId).firstOrNull;
+    if (staff == null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(context.t('pick_staff_for_slots'), style: TextStyle(color: Theme.of(context).hintColor)),
+      );
+    }
+    final appts = ref.watch(appointmentsProvider).value ?? const <Appointment>[];
+    final dayEnd = _date.add(const Duration(days: 1));
+    final bookings = appts.where((a) => a.staffId == staff.id && a.start.isBefore(dayEnd) && a.end.isAfter(_date));
+    final dur = _end.difference(_start).inMinutes;
+    final slots = SlotFinder.free(
+      hours: staff.hours,
+      day: _date,
+      durationMin: dur <= 0 ? 30 : dur,
+      staffBookings: bookings,
+      stepMin: 15,
+      now: DateTime.now(),
+      ignoreIds: {if (widget.appointment?.id != null) widget.appointment!.id!},
+    );
+    final ar = context.ar;
+    final spans = staff.hours.forDay(_date.weekday);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 24),
+        Row(
+          children: [
+            Icon(Icons.access_time_filled_rounded, size: 18, color: Color(staff.color)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('${context.t('available_times')} — ${staff.name}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          spans.isEmpty
+              ? context.t('day_off')
+              : '${context.t('work_hours')}: ${spans.map((sp) => '${TimeFmt.time(_date.add(Duration(minutes: sp.start)), ar: ar)} - ${TimeFmt.time(_date.add(Duration(minutes: sp.end)), ar: ar)}').join(' ، ')}',
+          style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
+        ),
+        const SizedBox(height: 8),
+        if (slots.isEmpty)
+          Text(
+            context.t('no_slots'),
+            style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w700),
+          )
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final sl in slots)
+                ChoiceChip(
+                  selected: sl == _start,
+                  label: Text(TimeFmt.time(sl, ar: ar)),
+                  onSelected: (_) => setState(() {
+                    final d = _end.difference(_start);
+                    _startT = TimeOfDay(hour: sl.hour, minute: sl.minute);
+                    final e = sl.add(d);
+                    _endT = TimeOfDay(hour: e.hour, minute: e.minute);
+                  }),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ar = context.ar;
@@ -393,29 +573,33 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                 ],
               ),
             ),
-            SectionTitle(
-              context.t('event_type'),
-              trailing: TextButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoriesScreen())),
-                icon: const Icon(Icons.tune_rounded, size: 18),
-                label: Text(context.t('manage')),
+            if (Edition.isCenter)
+              ..._centerSection(context)
+            else ...[
+              SectionTitle(
+                context.t('event_type'),
+                trailing: TextButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoriesScreen())),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: Text(context.t('manage')),
+                ),
               ),
-            ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final c in cats)
-                  ChoiceChip(
-                    selected: _categoryId == c.id,
-                    onSelected: (_) => setState(() => _categoryId = c.id),
-                    avatar: Icon(categoryIcon(c.icon), size: 18, color: Color(c.color)),
-                    label: Text(c.name(ar)),
-                    selectedColor: Color(c.color).withValues(alpha: 0.25),
-                    side: BorderSide(color: Color(c.color).withValues(alpha: 0.6)),
-                  ),
-              ],
-            ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in cats)
+                    ChoiceChip(
+                      selected: _categoryId == c.id,
+                      onSelected: (_) => setState(() => _categoryId = c.id),
+                      avatar: Icon(categoryIcon(c.icon), size: 18, color: Color(c.color)),
+                      label: Text(c.name(ar)),
+                      selectedColor: Color(c.color).withValues(alpha: 0.25),
+                      side: BorderSide(color: Color(c.color).withValues(alpha: 0.6)),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -496,6 +680,7 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                         ),
                     ],
                   ),
+                  if (Edition.isCenter) _slots(context),
                 ],
               ),
             ),
@@ -505,92 +690,94 @@ class _AppointmentFormScreenState extends ConsumerState<AppointmentFormScreen> {
                 child: _RecurrenceEditor(rule: _rule, start: _start, onChanged: (r) => setState(() => _rule = r)),
               ),
             ],
-            SectionTitle(context.t('location')),
-            Glass(
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _place,
-                    decoration: InputDecoration(labelText: context.t('place_name'), prefixIcon: const Icon(Icons.location_city_rounded)),
-                  ),
-                  const SizedBox(height: 10),
-                  RawAutocomplete<String>(
-                    textEditingController: _province,
-                    focusNode: _provinceFocus,
-                    optionsBuilder: (v) => kIraqProvinces.where((p) => p.contains(v.text.trim())),
-                    fieldViewBuilder: (c, ctrl, focus, submit) => TextFormField(
-                      controller: ctrl,
-                      focusNode: focus,
-                      decoration: InputDecoration(labelText: context.t('province'), prefixIcon: const Icon(Icons.map_rounded)),
+            if (!Edition.isCenter) ...[
+              SectionTitle(context.t('location')),
+              Glass(
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _place,
+                      decoration: InputDecoration(labelText: context.t('place_name'), prefixIcon: const Icon(Icons.location_city_rounded)),
                     ),
-                    optionsViewBuilder: (c, onSel, options) => Align(
-                      alignment: ar ? Alignment.topRight : Alignment.topLeft,
-                      child: Material(
-                        elevation: 6,
-                        borderRadius: BorderRadius.circular(16),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 240, maxWidth: 260),
-                          child: ListView(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            children: [for (final o in options) ListTile(title: Text(o), onTap: () => onSel(o))],
+                    const SizedBox(height: 10),
+                    RawAutocomplete<String>(
+                      textEditingController: _province,
+                      focusNode: _provinceFocus,
+                      optionsBuilder: (v) => kIraqProvinces.where((p) => p.contains(v.text.trim())),
+                      fieldViewBuilder: (c, ctrl, focus, submit) => TextFormField(
+                        controller: ctrl,
+                        focusNode: focus,
+                        decoration: InputDecoration(labelText: context.t('province'), prefixIcon: const Icon(Icons.map_rounded)),
+                      ),
+                      optionsViewBuilder: (c, onSel, options) => Align(
+                        alignment: ar ? Alignment.topRight : Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(16),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 240, maxWidth: 260),
+                            child: ListView(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              children: [for (final o in options) ListTile(title: Text(o), onTap: () => onSel(o))],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _area,
-                    decoration: InputDecoration(labelText: context.t('area'), prefixIcon: const Icon(Icons.holiday_village_rounded)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _address,
-                    maxLines: 2,
-                    decoration: InputDecoration(labelText: context.t('address_detail'), prefixIcon: const Icon(Icons.home_work_rounded)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _landmark,
-                    decoration: InputDecoration(labelText: context.t('landmark'), prefixIcon: const Icon(Icons.flag_rounded)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _map,
-                    textDirection: TextDirection.ltr,
-                    onChanged: _parseMap,
-                    decoration: InputDecoration(
-                      labelText: context.t('map_link'),
-                      prefixIcon: const Icon(Icons.pin_drop_rounded),
-                      suffixIcon: IconButton(tooltip: context.t('paste'), icon: const Icon(Icons.content_paste_rounded), onPressed: _pasteMap),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _area,
+                      decoration: InputDecoration(labelText: context.t('area'), prefixIcon: const Icon(Icons.holiday_village_rounded)),
                     ),
-                  ),
-                  if (_lat != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.gps_fixed_rounded, size: 18, color: Color(0xFF00C853)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${_lat!.toStringAsFixed(6)}, ${_lng!.toStringAsFixed(6)}',
-                              textDirection: TextDirection.ltr,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Launcher.openMap(_build(), app: settings.mapsApp, navigate: false),
-                            child: Text(context.t('preview')),
-                          ),
-                          IconButton(onPressed: () => setState(() => _lat = _lng = null), icon: const Icon(Icons.close_rounded)),
-                        ],
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _address,
+                      maxLines: 2,
+                      decoration: InputDecoration(labelText: context.t('address_detail'), prefixIcon: const Icon(Icons.home_work_rounded)),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _landmark,
+                      decoration: InputDecoration(labelText: context.t('landmark'), prefixIcon: const Icon(Icons.flag_rounded)),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _map,
+                      textDirection: TextDirection.ltr,
+                      onChanged: _parseMap,
+                      decoration: InputDecoration(
+                        labelText: context.t('map_link'),
+                        prefixIcon: const Icon(Icons.pin_drop_rounded),
+                        suffixIcon: IconButton(tooltip: context.t('paste'), icon: const Icon(Icons.content_paste_rounded), onPressed: _pasteMap),
                       ),
                     ),
-                ],
+                    if (_lat != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.gps_fixed_rounded, size: 18, color: Color(0xFF00C853)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${_lat!.toStringAsFixed(6)}, ${_lng!.toStringAsFixed(6)}',
+                                textDirection: TextDirection.ltr,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Launcher.openMap(_build(), app: settings.mapsApp, navigate: false),
+                              child: Text(context.t('preview')),
+                            ),
+                            IconButton(onPressed: () => setState(() => _lat = _lng = null), icon: const Icon(Icons.close_rounded)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
+            ],
             if (settings.showFinance) ...[
               SectionTitle(context.t('payment')),
               Glass(

@@ -11,6 +11,7 @@ import '../providers.dart';
 import '../widgets/common.dart';
 import '../widgets/reminder_editor.dart';
 import '../widgets/sound_picker.dart';
+import '../../core/edition.dart';
 
 /// إعدادات التنبيهات + الصلاحيات + صفحة اختبار التنبيهات والأصوات.
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
@@ -123,6 +124,27 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
               onChanged: (c) => _save(s.copyWith(reminders: c)),
             ),
           ),
+          if (Edition.isCenter) ...[
+            SectionTitle(context.t('notify_for')),
+            Glass(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<int>(
+                    initialValue: s.notifyStaffId,
+                    decoration: InputDecoration(labelText: context.t('notify_for'), prefixIcon: const Icon(Icons.badge_rounded)),
+                    items: [
+                      DropdownMenuItem(value: 0, child: Text(context.t('all_staff'))),
+                      for (final st in ref.watch(staffProvider).value ?? const <Staff>[]) DropdownMenuItem(value: st.id, child: Text(st.name)),
+                    ],
+                    onChanged: (v) => _save(s.copyWith(notifyStaffId: v ?? 0)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(context.t('notify_for_hint'), style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                ],
+              ),
+            ),
+          ],
           SectionTitle(context.t('alarm_behavior')),
           Glass(
             child: Column(

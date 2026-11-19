@@ -1,11 +1,14 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/edition.dart';
 import '../../core/l10n/tr.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/time/time_format.dart';
 import '../../domain/entities/entities.dart';
+import '../providers.dart';
 
 /// خلفية التطبيق: تدرج داكن/فاتح مع هالتين حمراء وزرقاء ضبابيتين (روح الهلال).
 class AppBackground extends StatelessWidget {
@@ -250,7 +253,7 @@ class StatusChip extends StatelessWidget {
 }
 
 /// بطاقة حجز مختصرة في القوائم.
-class AppointmentTile extends StatelessWidget {
+class AppointmentTile extends ConsumerWidget {
   const AppointmentTile({super.key, required this.appt, required this.category, required this.now, this.onTap, this.showDate = false, this.trailing});
 
   final Appointment appt;
@@ -261,10 +264,19 @@ class AppointmentTile extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ar = context.ar;
-    final color = Color(category?.color ?? 0xFF9E9E9E);
+    Staff? staff;
+    ServiceItem? service;
+    if (Edition.isCenter) {
+      staff = (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.id == appt.staffId).firstOrNull;
+      service = (ref.watch(servicesProvider).value ?? const <ServiceItem>[]).where((x) => x.id == appt.serviceId).firstOrNull;
+    }
+    final color = Color(service?.color ?? staff?.color ?? category?.color ?? 0xFF9E9E9E);
     final st = appt.effectiveStatus(now);
+    final info = Edition.isCenter
+        ? [service?.name, staff?.name].where((e) => e != null && e.isNotEmpty).join(' • ')
+        : [category?.name(ar), appt.placeName].where((e) => e != null && e.isNotEmpty).join(' • ');
     return Glass(
       onTap: onTap,
       blur: 0,
@@ -280,7 +292,14 @@ class AppointmentTile extends StatelessWidget {
               gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.6)]),
               boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
             ),
-            child: Icon(categoryIcon(category?.icon ?? 'event'), color: Colors.white),
+            child: staff != null
+                ? Center(
+                    child: Text(
+                      staff.name.isEmpty ? '?' : staff.name.characters.first,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20),
+                    ),
+                  )
+                : Icon(Edition.isCenter ? Icons.content_cut_rounded : categoryIcon(category?.icon ?? 'event'), color: Colors.white),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -305,9 +324,9 @@ class AppointmentTile extends StatelessWidget {
                   '${showDate ? '${TimeFmt.date(appt.start, ar: ar)} • ' : ''}${TimeFmt.range(appt.start, appt.end, ar: ar)}',
                   style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor, fontWeight: FontWeight.w600),
                 ),
-                if (appt.placeName.isNotEmpty || category != null)
+                if (info.isNotEmpty)
                   Text(
-                    [category?.name(ar), appt.placeName].where((e) => e != null && e.isNotEmpty).join(' • '),
+                    info,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w700),
@@ -392,3 +411,46 @@ Future<TimeOfDay?> pickTime12(BuildContext context, TimeOfDay initial) => showTi
 );
 
 String formatTod(BuildContext context, TimeOfDay t) => TimeFmt.time(DateTime(2026, 1, 1, t.hour, t.minute), ar: context.ar);
+
+/// شريط اختيار الموظف (الكل / موظف محدد) — نسخة المركز.
+class StaffFilterBar extends ConsumerWidget {
+  const StaffFilterBar({super.key, required this.staff});
+  final List<Staff> staff;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sel = ref.watch(staffFilterProvider);
+    return SizedBox(
+      height: 46,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 6),
+            child: ChoiceChip(
+              selected: sel == null,
+              avatar: const Icon(Icons.groups_rounded, size: 18),
+              label: Text(context.t('all_staff')),
+              onSelected: (_) => ref.read(staffFilterProvider.notifier).set(null),
+            ),
+          ),
+          for (final x in staff)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: ChoiceChip(
+                selected: sel == x.id,
+                avatar: CircleAvatar(
+                  backgroundColor: Color(x.color),
+                  child: Text(x.name.isEmpty ? '?' : x.name.characters.first, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                ),
+                label: Text(x.name),
+                selectedColor: Color(x.color).withValues(alpha: 0.25),
+                onSelected: (_) => ref.read(staffFilterProvider.notifier).set(x.id),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

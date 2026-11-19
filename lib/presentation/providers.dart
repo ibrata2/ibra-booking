@@ -21,6 +21,8 @@ final categoryRepoProvider = Provider<CategoryRepository>((ref) => SqliteCategor
 final soundRepoProvider = Provider<SoundRepository>((ref) => SqliteSoundRepository(ref.watch(databaseProvider).db));
 final financeRepoProvider = Provider<FinanceRepository>((ref) => SqliteFinanceRepository(ref.watch(databaseProvider).db));
 final attachmentRepoProvider = Provider<AttachmentRepository>((ref) => SqliteAttachmentRepository(ref.watch(databaseProvider).db));
+final staffRepoProvider = Provider<StaffRepository>((ref) => SqliteStaffRepository(ref.watch(databaseProvider).db));
+final serviceRepoProvider = Provider<ServiceRepository>((ref) => SqliteServiceRepository(ref.watch(databaseProvider).db));
 final settingsRepoProvider = Provider<SettingsRepository>((ref) => SqliteSettingsRepository(ref.watch(databaseProvider).db));
 final reminderLogRepoProvider = Provider<ReminderLogRepository>((ref) => SqliteReminderLogRepository(ref.watch(databaseProvider).db));
 
@@ -69,6 +71,25 @@ final customSoundsProvider = FutureProvider<List<AlertSound>>((ref) async {
   ref.watch(dataVersionProvider);
   return ref.watch(soundRepoProvider).all();
 });
+
+final staffProvider = FutureProvider<List<Staff>>((ref) async {
+  ref.watch(dataVersionProvider);
+  return ref.watch(staffRepoProvider).all();
+});
+
+final servicesProvider = FutureProvider<List<ServiceItem>>((ref) async {
+  ref.watch(dataVersionProvider);
+  return ref.watch(serviceRepoProvider).all();
+});
+
+/// فلتر الموظف المعروض في الرئيسية والتقويم (null = الكل).
+class StaffFilter extends Notifier<int?> {
+  @override
+  int? build() => null;
+  void set(int? id) => state = id;
+}
+
+final staffFilterProvider = NotifierProvider<StaffFilter, int?>(StaffFilter.new);
 
 final paidTotalsProvider = FutureProvider<Map<int, double>>((ref) async {
   ref.watch(dataVersionProvider);

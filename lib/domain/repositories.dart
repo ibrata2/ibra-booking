@@ -78,3 +78,15 @@ abstract interface class ReminderLogRepository {
   Future<void> acknowledgeAppointment(int appointmentId);
   Future<Set<int>> acknowledgedIds();
 }
+
+abstract interface class StaffRepository {
+  Future<List<Staff>> all();
+  Future<int> save(Staff s);
+  Future<void> delete(int id);
+}
+
+abstract interface class ServiceRepository {
+  Future<List<ServiceItem>> all();
+  Future<int> save(ServiceItem s);
+  Future<void> delete(int id);
+}

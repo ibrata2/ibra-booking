@@ -15,7 +15,11 @@ import sys
 from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "assets", "icon", "source_general.png" if "--general" in sys.argv else "source.png")
+EDITION = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--edition=")), "general" if "--general" in sys.argv else "events")
+_ICON_DIR = os.path.join(ROOT, "assets", "icon")
+# كل نسخة تبحث عن source_<edition>.png، ثم أيقونة النسخة العامة، ثم الأصلية
+_CANDIDATES = ["source_%s.png" % EDITION, "source_general.png", "source.png"] if EDITION != "events" else ["source.png"]
+SRC = next(os.path.join(_ICON_DIR, c) for c in _CANDIDATES if os.path.exists(os.path.join(_ICON_DIR, c)))
 BG = (11, 16, 38)  # كحلي داكن للخلفيات
 
 
@@ -75,7 +79,7 @@ def notification_crescent(size=512):
 
 def gen_assets(tile):
     logo = rounded(inner(tile, 0.0), 0.2)
-    name = "logo_general.png" if "--general" in sys.argv else "logo.png"
+    name = "logo.png" if EDITION == "events" else "logo_%s.png" % EDITION
     save(logo, os.path.join(ROOT, "assets", "images", name), 512)
     save(tile, os.path.join(ROOT, "dist_assets", "play_store_icon_512.png"), 512, "RGB")
 

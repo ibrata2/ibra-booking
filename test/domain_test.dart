@@ -209,4 +209,50 @@ void main() {
       expect(latin1.decode(b.sublist(0, 8)), '%PDF-1.4');
     });
   });
+
+  group('نسخة المركز', () {
+    Appointment st(int id, int staff, DateTime s, DateTime e) =>
+        Appointment(id: id, staffId: staff, customerName: 'ز$id', start: s, end: e, createdAt: DateTime(2026), updatedAt: DateTime(2026));
+    test('التعارض لكل موظف وحده', () {
+      final ex = [st(1, 1, DateTime(2026, 5, 2, 12), DateTime(2026, 5, 2, 13))];
+      expect(
+        ConflictChecker.find(start: DateTime(2026, 5, 2, 12), end: DateTime(2026, 5, 2, 13), existing: ex, perStaff: true, staffId: 2).isEmpty,
+        true,
+      );
+      expect(
+        ConflictChecker.find(start: DateTime(2026, 5, 2, 12), end: DateTime(2026, 5, 2, 13), existing: ex, perStaff: true, staffId: 1).length,
+        1,
+      );
+    });
+    test('الأوقات الفارغة ضمن الدوام', () {
+      // 2026/05/02 سبت — دوام 10:00–13:00 مع استراحة، ثم 14:00–16:00
+      final h = WorkHours({
+        6: const [WorkSpan(600, 780), WorkSpan(840, 960)],
+      });
+      final slots = SlotFinder.free(
+        hours: h,
+        day: DateTime(2026, 5, 2),
+        durationMin: 60,
+        staffBookings: [st(1, 1, DateTime(2026, 5, 2, 11), DateTime(2026, 5, 2, 12))],
+        stepMin: 30,
+      );
+      expect(slots.map((d) => TimeFmt.time(d)).toList(), ['10:00 صباحاً', '12:00 ظهراً', '02:00 مساءً', '02:30 مساءً', '03:00 مساءً']);
+    });
+    test('يوم العطلة بلا أوقات', () {
+      final slots = SlotFinder.free(hours: WorkHours.standard(), day: DateTime(2026, 5, 1), durationMin: 30, staffBookings: const []);
+      expect(slots.isEmpty, true); // الجمعة
+    });
+    test('الدوام يغطي الحجز', () {
+      final h = WorkHours.standard();
+      expect(h.covers(DateTime(2026, 5, 2, 10), DateTime(2026, 5, 2, 11)), true);
+      expect(h.covers(DateTime(2026, 5, 2, 19, 30), DateTime(2026, 5, 2, 20, 30)), false);
+      expect(WorkHours.decode(h.encode()).forDay(6).first.end, 1200);
+    });
+    test('تذكير قبل 15 دقيقة', () {
+      final a = st(9, 1, DateTime(2026, 5, 2, 12), DateTime(2026, 5, 2, 13));
+      const cfg = ReminderConfig(approachStartMin: 15, approachEnd: false, end: false, nextBooking: false);
+      final p = ReminderPlanner.plan(appointments: [a], defaults: cfg, now: DateTime(2026, 5, 1), horizon: DateTime(2026, 6, 1), perStaff: true);
+      expect(p.map((x) => TimeFmt.time(x.fireAt)).toList(), ['11:45 صباحاً', '12:00 ظهراً']);
+    });
+  });
 }

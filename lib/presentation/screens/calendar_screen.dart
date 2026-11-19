@@ -12,6 +12,7 @@ import '../widgets/common.dart';
 import 'appointment_details_screen.dart';
 import 'appointment_form_screen.dart';
 import 'search_screen.dart';
+import '../../core/edition.dart';
 
 enum CalView { day, week, month, year, list }
 
@@ -66,13 +67,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   /// نقل حجز بالسحب والإفلات مع طلب التأكيد وفحص التعارض.
-  Future<void> _move(Appointment a, DateTime newStart) async {
-    if (newStart == a.start) return;
+  Future<void> _move(Appointment a, DateTime newStart, [int? toStaff]) async {
+    final staffChanged = Edition.isCenter && toStaff != a.staffId;
+    if (newStart == a.start && !staffChanged) return;
     final ar = context.ar;
     final ok = await confirmDialog(
       context,
       title: context.t('move_booking'),
-      message: context.t('move_confirm', {
+      message: context.t(staffChanged ? 'move_confirm_staff' : 'move_confirm', {
+        'staff': (ref.read(staffProvider).value ?? const <Staff>[]).where((x) => x.id == toStaff).firstOrNull?.name ?? context.t('unassigned'),
         'name': a.customerName,
         'date': TimeFmt.dateLong(newStart, ar: ar),
         'time': TimeFmt.range(newStart, newStart.add(a.duration), ar: ar),
@@ -81,7 +84,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
     if (!ok || !mounted) return;
     final ctrl = ref.read(bookingControllerProvider);
-    final conflicts = await ctrl.conflicts(newStart, newStart.add(a.duration), ignoreIds: {a.id!});
+    final conflicts = await ctrl.conflicts(newStart, newStart.add(a.duration), ignoreIds: {a.id!}, staffId: Edition.isCenter ? toStaff : null);
     if (conflicts.isNotEmpty && mounted) {
       final go = await confirmDialog(
         context,
@@ -96,7 +99,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       );
       if (!go) return;
     }
-    await ctrl.move(a, newStart);
+    await ctrl.move(a, newStart, staffId: toStaff, changeStaff: staffChanged);
     if (mounted) toast(context, context.t('moved'));
   }
 
@@ -110,30 +113,56 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final cats = ref.watch(categoriesProvider).value ?? const <EventCategory>[];
     final now = ref.watch(clockProvider).value ?? DateTime.now();
     final catMap = {for (final c in cats) c.id: c};
+    final staff = (ref.watch(staffProvider).value ?? const <Staff>[]).where((x) => x.active).toList();
+    final services = ref.watch(servicesProvider).value ?? const <ServiceItem>[];
+    final staffFilter = Edition.isCenter ? ref.watch(staffFilterProvider) : null;
+    final staffMap = {for (final x in staff) x.id: x};
+    final svcMap = {for (final x in services) x.id: x};
+    Color colorOf(Appointment a) {
+      if (Edition.isCenter) {
+        final sv = svcMap[a.serviceId];
+        if (sv != null) return Color(sv.color);
+        final st = staffMap[a.staffId];
+        if (st != null) return Color(st.color);
+      }
+      return Color(catMap[a.categoryId]?.color ?? 0xFF3D7BFF);
+    }
+
+    final shown = staffFilter == null ? appts : appts.where((a) => a.staffId == staffFilter).toList();
+    void add(DateTime d, int? staffId) => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AppointmentFormScreen(initialDate: d, initialStaffId: staffId ?? staffFilter),
+      ),
+    );
+    List<_Col> dayCols() {
+      if (!Edition.isCenter || staff.isEmpty) return [_Col(day: _focus)];
+      final list = staffFilter == null ? staff : staff.where((x) => x.id == staffFilter).toList();
+      final cols = [for (final x in list) _Col(day: _focus, byStaff: true, staffId: x.id, title: x.name, color: Color(x.color), hours: x.hours)];
+      final unassigned = appts.any((a) => a.staffId == null || !staffMap.containsKey(a.staffId)) && staffFilter == null;
+      if (unassigned && appts.any((a) => (a.staffId == null || !staffMap.containsKey(a.staffId)) && _segment(a, _focus) != null)) {
+        cols.add(_Col(day: _focus, byStaff: true, staffId: null, title: context.t('unassigned'), color: Colors.grey));
+      }
+      return cols;
+    }
 
     Widget body = switch (_view) {
-      CalView.day => _Timeline(
-        days: [_focus],
-        appts: appts,
-        cats: catMap,
-        onOpen: _open,
-        onMove: _move,
-        onAdd: (d) => Navigator.push(context, MaterialPageRoute(builder: (_) => AppointmentFormScreen(initialDate: d))),
-      ),
+      CalView.day => _Timeline(cols: dayCols(), appts: appts, colorOf: colorOf, onOpen: _open, onMove: _move, onAdd: add),
       CalView.week => _Timeline(
-        days: List.generate(7, (i) => TimeFmt.weekStart(_focus, settings.weekStart).add(Duration(days: i))),
-        appts: appts,
-        cats: catMap,
+        cols: [for (var i = 0; i < 7; i++) _Col(day: TimeFmt.weekStart(_focus, settings.weekStart).add(Duration(days: i)))],
+        appts: shown,
+        colorOf: colorOf,
         onOpen: _open,
         onMove: _move,
-        onAdd: (d) => Navigator.push(context, MaterialPageRoute(builder: (_) => AppointmentFormScreen(initialDate: d))),
+        onAdd: add,
       ),
       CalView.month => _MonthView(
         focus: _focus,
         selected: _selected,
         weekStart: settings.weekStart,
-        appts: appts,
+        appts: shown,
         cats: catMap,
+        colorOf: colorOf,
         now: now,
         onSelect: (d) => setState(() => _selected = d),
         onOpen: _open,
@@ -142,13 +171,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       CalView.year => _YearView(
         year: _focus.year,
         weekStart: settings.weekStart,
-        appts: appts,
+        appts: shown,
         onMonth: (m) => setState(() {
           _focus = DateTime(_focus.year, m, 1);
           _view = CalView.month;
         }),
       ),
-      CalView.list => _ListView(month: _focus, appts: appts, cats: catMap, now: now, onOpen: _open),
+      CalView.list => _ListView(month: _focus, appts: shown, cats: catMap, now: now, onOpen: _open),
     };
 
     return SafeArea(
@@ -209,6 +238,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               }),
             ),
           ),
+          if (Edition.isCenter && staff.isNotEmpty) StaffFilterBar(staff: staff),
           Expanded(child: body),
         ],
       ),
@@ -228,20 +258,33 @@ class _DragData {
   const _DragData(this.appt);
 }
 
+/// عمود في عرض الخط الزمني: يوم (عرض يومي/أسبوعي) أو موظف (نسخة المركز).
+class _Col {
+  final DateTime day;
+  final bool byStaff;
+  final int? staffId;
+  final String title;
+  final Color? color;
+  final WorkHours? hours;
+  const _Col({required this.day, this.byStaff = false, this.staffId, this.title = '', this.color, this.hours});
+}
+
 class _Timeline extends StatefulWidget {
-  const _Timeline({required this.days, required this.appts, required this.cats, required this.onOpen, required this.onMove, required this.onAdd});
-  final List<DateTime> days;
+  const _Timeline({required this.cols, required this.appts, required this.colorOf, required this.onOpen, required this.onMove, required this.onAdd});
+  final List<_Col> cols;
   final List<Appointment> appts;
-  final Map<int?, EventCategory> cats;
+  final Color Function(Appointment) colorOf;
   final ValueChanged<Appointment> onOpen;
-  final Future<void> Function(Appointment, DateTime) onMove;
-  final ValueChanged<DateTime> onAdd;
+  final Future<void> Function(Appointment, DateTime, int?) onMove;
+  final void Function(DateTime, int?) onAdd;
   @override
   State<_Timeline> createState() => _TimelineState();
 }
 
 class _TimelineState extends State<_Timeline> {
   static const hourH = 64.0;
+  static const labelW = 64.0;
+  static const minColW = 118.0;
   late final ScrollController _scroll = ScrollController(initialScrollOffset: hourH * math.max(0, DateTime.now().hour - 2));
 
   @override
@@ -250,82 +293,124 @@ class _TimelineState extends State<_Timeline> {
     super.dispose();
   }
 
+  Widget _header(_Col c, DateTime now, bool ar) {
+    if (c.byStaff) {
+      final color = c.color ?? Theme.of(context).colorScheme.primary;
+      return Container(
+        margin: const EdgeInsets.all(2),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: color.withValues(alpha: 0.18)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 11,
+              backgroundColor: color,
+              child: Text(
+                c.title.isEmpty ? '?' : c.title.characters.first,
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                c.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final d = c.day;
+    return Container(
+      margin: const EdgeInsets.all(2),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        color: TimeFmt.sameDay(d, now) ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2) : null,
+      ),
+      child: Column(
+        children: [
+          Text(TimeFmt.weekdayShort(d.weekday, ar: ar), style: const TextStyle(fontSize: 11)),
+          Text('${d.day}', style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ar = context.ar;
     final now = DateTime.now();
-    final multi = widget.days.length > 1;
-    const labelW = 64.0;
-    return Column(
-      children: [
-        if (multi)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: labelW),
-            child: Row(
-              children: [
-                for (final d in widget.days)
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: TimeFmt.sameDay(d, now) ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2) : null,
-                      ),
-                      child: Column(
-                        children: [
-                          Text(TimeFmt.weekdayShort(d.weekday, ar: ar), style: const TextStyle(fontSize: 11)),
-                          Text('${d.day}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.only(bottom: 110),
-            child: SizedBox(
-              height: hourH * 24,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: labelW,
-                    child: Column(
+    final showHeader = widget.cols.length > 1 || widget.cols.first.byStaff;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final staffMode = widget.cols.any((c) => c.byStaff);
+        final need = labelW + widget.cols.length * minColW;
+        final width = staffMode && need > box.maxWidth ? need : box.maxWidth;
+        final content = SizedBox(
+          width: width,
+          height: box.maxHeight,
+          child: Column(
+            children: [
+              if (showHeader)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: labelW),
+                  child: Row(children: [for (final c in widget.cols) Expanded(child: _header(c, now, ar))]),
+                ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.only(bottom: 110),
+                  child: SizedBox(
+                    height: hourH * 24,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (var h = 0; h < 24; h++)
-                          SizedBox(
-                            height: hourH,
-                            child: Align(
-                              alignment: AlignmentDirectional.topEnd,
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.only(end: 6),
-                                child: Text(
-                                  TimeFmt.time(DateTime(2026, 1, 1, h), ar: ar).replaceAll(':00', ''),
-                                  style: TextStyle(fontSize: 10.5, color: Theme.of(context).hintColor),
+                        SizedBox(
+                          width: labelW,
+                          child: Column(
+                            children: [
+                              for (var h = 0; h < 24; h++)
+                                SizedBox(
+                                  height: hourH,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.topEnd,
+                                    child: Padding(
+                                      padding: const EdgeInsetsDirectional.only(end: 6),
+                                      child: Text(
+                                        TimeFmt.time(DateTime(2026, 1, 1, h), ar: ar).replaceAll(':00', ''),
+                                        style: TextStyle(fontSize: 10.5, color: Theme.of(context).hintColor),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                            ],
                           ),
+                        ),
+                        for (final c in widget.cols) Expanded(child: _column(c, now)),
                       ],
                     ),
                   ),
-                  for (final d in widget.days) Expanded(child: _dayColumn(d, now)),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ),
-      ],
+        );
+        if (width <= box.maxWidth) return content;
+        return SingleChildScrollView(scrollDirection: Axis.horizontal, child: content);
+      },
     );
   }
 
-  Widget _dayColumn(DateTime day, DateTime now) {
+  Widget _column(_Col col, DateTime now) {
+    final day = col.day;
     final segs = <({Appointment a, DateTime s, DateTime e})>[];
     for (final a in widget.appts) {
+      if (col.byStaff && a.staffId != col.staffId) continue;
       final g = _segment(a, day);
       if (g != null) segs.add((a: a, s: g.s, e: g.e));
     }
@@ -345,26 +430,49 @@ class _TimelineState extends State<_Timeline> {
     }
     final laneCount = math.max(1, lanes.length);
     final ds = TimeFmt.dayStart(day);
+    // تظليل خارج ساعات الدوام
+    final off = <(int, int)>[];
+    if (col.hours != null) {
+      var cursor = 0;
+      for (final sp in col.hours!.forDay(day.weekday)) {
+        if (sp.start > cursor) off.add((cursor, sp.start));
+        cursor = math.max(cursor, sp.end);
+      }
+      if (cursor < 1440) off.add((cursor, 1440));
+    }
+    final shade = Theme.of(context).brightness == Brightness.dark ? Colors.black.withValues(alpha: 0.28) : Colors.black.withValues(alpha: 0.06);
     return LayoutBuilder(
       builder: (c, box) {
         final w = box.maxWidth;
         return Stack(
           children: [
+            for (final o in off)
+              Positioned(
+                top: o.$1 / 60 * hourH,
+                height: (o.$2 - o.$1) / 60 * hourH,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(child: ColoredBox(color: shade)),
+              ),
             // خانات الإفلات (كل ربع ساعة)
             Column(
               children: [
                 for (var q = 0; q < 96; q++)
                   DragTarget<_DragData>(
                     onWillAcceptWithDetails: (_) => true,
-                    onAcceptWithDetails: (d) => widget.onMove(d.data.appt, ds.add(Duration(minutes: q * 15))),
+                    onAcceptWithDetails: (d) =>
+                        widget.onMove(d.data.appt, ds.add(Duration(minutes: q * 15)), col.byStaff ? col.staffId : d.data.appt.staffId),
                     builder: (c, cand, _) => GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onLongPress: () => widget.onAdd(ds.add(Duration(minutes: (q ~/ 4) * 60))),
+                      onLongPress: () => widget.onAdd(ds.add(Duration(minutes: (q ~/ 2) * 30)), col.byStaff ? col.staffId : null),
                       child: Container(
                         height: hourH / 4,
                         decoration: BoxDecoration(
                           color: cand.isNotEmpty ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.25) : null,
-                          border: q % 4 == 0 ? Border(top: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.35))) : null,
+                          border: Border(
+                            top: q % 4 == 0 ? BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.35)) : BorderSide.none,
+                            left: col.byStaff ? BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)) : BorderSide.none,
+                          ),
                         ),
                       ),
                     ),
@@ -385,7 +493,7 @@ class _TimelineState extends State<_Timeline> {
                 height: math.max(22, segs[i].e.difference(segs[i].s).inMinutes / 60 * hourH - 2),
                 start: laneOf[i] * (w / laneCount) + 1,
                 width: w / laneCount - 2,
-                child: _EventBlock(appt: segs[i].a, cat: widget.cats[segs[i].a.categoryId], onTap: () => widget.onOpen(segs[i].a)),
+                child: _EventBlock(appt: segs[i].a, color: widget.colorOf(segs[i].a), onTap: () => widget.onOpen(segs[i].a)),
               ),
           ],
         );
@@ -395,15 +503,14 @@ class _TimelineState extends State<_Timeline> {
 }
 
 class _EventBlock extends StatelessWidget {
-  const _EventBlock({required this.appt, required this.cat, required this.onTap});
+  const _EventBlock({required this.appt, required this.color, required this.onTap});
   final Appointment appt;
-  final EventCategory? cat;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final ar = context.ar;
-    final color = Color(cat?.color ?? 0xFF3D7BFF);
     final faded = appt.status == BookingStatus.cancelled;
     Widget box({double opacity = 1}) => Opacity(
       opacity: opacity,
@@ -440,6 +547,7 @@ class _MonthView extends StatelessWidget {
     required this.weekStart,
     required this.appts,
     required this.cats,
+    required this.colorOf,
     required this.now,
     required this.onSelect,
     required this.onOpen,
@@ -450,6 +558,7 @@ class _MonthView extends StatelessWidget {
   final int weekStart;
   final List<Appointment> appts;
   final Map<int?, EventCategory> cats;
+  final Color Function(Appointment) colorOf;
   final DateTime now;
   final ValueChanged<DateTime> onSelect;
   final ValueChanged<Appointment> onOpen;
@@ -539,10 +648,7 @@ class _MonthView extends StatelessWidget {
                                             Container(
                                               width: 7,
                                               height: 7,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: Color(cats[a.categoryId]?.color ?? 0xFF9E9E9E),
-                                              ),
+                                              decoration: BoxDecoration(shape: BoxShape.circle, color: colorOf(a)),
                                             ),
                                         ],
                                       ),
@@ -585,7 +691,7 @@ class _MonthView extends StatelessWidget {
                 child: Container(
                   width: 220,
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Color(cats[a.categoryId]?.color ?? 0xFF3D7BFF), borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(color: colorOf(a), borderRadius: BorderRadius.circular(14)),
                   child: Text(
                     a.customerName,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),

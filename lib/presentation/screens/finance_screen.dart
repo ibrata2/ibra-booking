@@ -11,6 +11,7 @@ import '../../services/export_service.dart';
 import '../providers.dart';
 import '../widgets/common.dart';
 import 'appointment_details_screen.dart';
+import '../../core/edition.dart';
 
 enum Period { day, week, month, year, custom }
 
@@ -76,8 +77,10 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     final expenses = ref.watch(_expensesRangeProvider((r.$1.millisecondsSinceEpoch, r.$2.millisecondsSinceEpoch))).value ?? const <Expense>[];
     final now = DateTime.now();
 
-    final inPeriod = appts.where((a) => a.status != BookingStatus.cancelled && !a.start.isBefore(r.$1) && a.start.isBefore(r.$2)).toList()
-      ..sort((a, b) => a.start.compareTo(b.start));
+    final staffList = Edition.isCenter ? (ref.watch(staffProvider).value ?? const <Staff>[]) : const <Staff>[];
+    final staffSel = Edition.isCenter ? ref.watch(staffFilterProvider) : null;
+    final periodAll = appts.where((a) => a.status != BookingStatus.cancelled && !a.start.isBefore(r.$1) && a.start.isBefore(r.$2)).toList();
+    final inPeriod = periodAll.where((a) => staffSel == null || a.staffId == staffSel).toList()..sort((a, b) => a.start.compareTo(b.start));
     final rows = [for (final a in inPeriod) ReportRow(a, cats.where((c) => c.id == a.categoryId).firstOrNull?.name(ar) ?? '', receivedFor(a, paid))];
     final summary = ReportSummary(
       count: rows.length,
@@ -175,6 +178,37 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               ),
             ],
           ),
+          if (Edition.isCenter && staffList.isNotEmpty) ...[
+            SectionTitle(context.t('per_staff_revenue')),
+            Glass(
+              child: Column(
+                children: [
+                  for (final st in staffList)
+                    Builder(
+                      builder: (context) {
+                        final mine = periodAll.where((a) => a.staffId == st.id).toList();
+                        final fees = mine.fold(0.0, (s, a) => s + a.fee);
+                        final got = mine.fold(0.0, (s, a) => s + receivedFor(a, paid));
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          onTap: () => ref.read(staffFilterProvider.notifier).set(staffSel == st.id ? null : st.id),
+                          selected: staffSel == st.id,
+                          leading: CircleAvatar(
+                            backgroundColor: Color(st.color),
+                            child: Text(st.name.isEmpty ? '?' : st.name.characters.first, style: const TextStyle(color: Colors.white)),
+                          ),
+                          title: Text(st.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text('${context.t('bookings_count')}: ${mine.length} • ${context.t('received')}: ${MoneyFmt.number(got)}'),
+                          trailing: Text(MoneyFmt.format(fees, sym), style: const TextStyle(fontWeight: FontWeight.w800)),
+                        );
+                      },
+                    ),
+                  if (staffSel != null)
+                    TextButton(onPressed: () => ref.read(staffFilterProvider.notifier).set(null), child: Text(context.t('all_staff'))),
+                ],
+              ),
+            ),
+          ],
           SectionTitle(context.t('revenue_chart')),
           Glass(
             padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),

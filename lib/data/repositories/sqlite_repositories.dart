@@ -336,3 +336,39 @@ class SqliteReminderLogRepository implements ReminderLogRepository {
   Future<Set<int>> acknowledgedIds() async =>
       (await db.query('reminders', columns: ['notification_id'], where: 'acknowledged = 1')).map((r) => r['notification_id'] as int).toSet();
 }
+
+class SqliteStaffRepository implements StaffRepository {
+  SqliteStaffRepository(this.db);
+  final Database db;
+
+  @override
+  Future<List<Staff>> all() async => (await db.query('staff', orderBy: 'sort, id')).map(Staff.fromMap).toList();
+
+  @override
+  Future<int> save(Staff s) async {
+    if (s.id == null) return db.insert('staff', s.toMap());
+    await db.update('staff', s.toMap(), where: 'id = ?', whereArgs: [s.id]);
+    return s.id!;
+  }
+
+  @override
+  Future<void> delete(int id) => db.delete('staff', where: 'id = ?', whereArgs: [id]);
+}
+
+class SqliteServiceRepository implements ServiceRepository {
+  SqliteServiceRepository(this.db);
+  final Database db;
+
+  @override
+  Future<List<ServiceItem>> all() async => (await db.query('services', orderBy: 'sort, id')).map(ServiceItem.fromMap).toList();
+
+  @override
+  Future<int> save(ServiceItem s) async {
+    if (s.id == null) return db.insert('services', s.toMap());
+    await db.update('services', s.toMap(), where: 'id = ?', whereArgs: [s.id]);
+    return s.id!;
+  }
+
+  @override
+  Future<void> delete(int id) => db.delete('services', where: 'id = ?', whereArgs: [id]);
+}

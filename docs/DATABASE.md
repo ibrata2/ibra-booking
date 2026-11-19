@@ -1,6 +1,6 @@
 # قاعدة البيانات — IBRA BOOKING
 
-SQLite محلية (`ibra_booking.db`) عبر `sqflite`، الإصدار الحالي للمخطط: **1**.
+SQLite محلية (`ibra_booking.db`) عبر `sqflite`، الإصدار الحالي للمخطط: **2**.
 المفاتيح الأجنبية مفعلة (`PRAGMA foreign_keys = ON`). كل الأوقات تخزن كطوابع زمنية بالملي ثانية (UTC epoch) وتعرض للمستخدم بنظام 12 ساعة فقط.
 
 ## الجداول
@@ -56,6 +56,14 @@ SQLite محلية (`ibra_booking.db`) عبر `sqflite`، الإصدار الحا
 
 ### settings — الإعدادات
 `key, value` — المفتاح `app` يحمل JSON لكل الإعدادات (`AppSettings`).
+
+### staff — الموظفون (الإصدار 2)
+`id, name, phone, role, color, hours_json, active, sort, created_ms` — `hours_json`: لكل يوم أسبوع قائمة فترات بالدقائق، مثل `{"6":[[600,780],[840,1200]],"5":[]}` (السبت دوام مع استراحة، الجمعة عطلة).
+
+### services — الخدمات (الإصدار 2)
+`id, name, duration_min, price, color, staff_ids ("1,3" أو فارغ = الكل), active, sort`
+
+وأُضيف إلى `appointments`: `staff_id` و `service_id` (SET NULL عند الحذف) مع فهرس على `staff_id`.
 
 ## الترقية دون فقدان البيانات
 `AppDatabase._migrations` خريطة `رقم الإصدار → دالة ALTER`. عند زيادة `AppDatabase.version` تنفذ الترقيات بالتسلسل ولا تحذف أي جدول.

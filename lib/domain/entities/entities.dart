@@ -2,6 +2,7 @@ export 'appointment.dart';
 export 'reminder_config.dart';
 export 'recurrence.dart';
 export 'app_settings.dart';
+export 'staff.dart';
 
 class Customer {
   final int? id;

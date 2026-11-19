@@ -70,6 +70,10 @@ class NotificationService {
   Stream<AlarmEvent> get events => _events.stream;
   AlarmEvent? pendingLaunch;
 
+  /// نسخة المركز: أسماء الموظفين والخدمات لعرضها في نص الإشعار.
+  Map<int, String> staffNames = const {};
+  Map<int, String> serviceNames = const {};
+
   static const actAck = 'ack';
   static const actSnooze = 'snooze';
   static const actCall = 'call';
@@ -236,6 +240,7 @@ class NotificationService {
       appointments: appts,
       defaults: settings.reminders,
       now: now.subtract(lookback),
+      perStaff: Edition.isCenter,
       horizon: now.add(const Duration(days: 45)),
     );
     final byId = {
@@ -401,6 +406,8 @@ class NotificationService {
     final title = '$prefix$head — ${appt.customerName}';
     final lines = <String>[
       if (cat != null) '${t('event_type')}: ${cat.name(ar)}',
+      if (appt.serviceId != null && serviceNames[appt.serviceId] != null) '${t('service')}: ${serviceNames[appt.serviceId]}',
+      if (appt.staffId != null && staffNames[appt.staffId] != null) '${t('staff_member')}: ${staffNames[appt.staffId]}',
       if (appt.placeName.isNotEmpty) '${t('place')}: ${appt.placeName}',
       if (appt.fullAddress.isNotEmpty) '${t('address')}: ${appt.fullAddress}',
       '${t('time')}: ${TimeFmt.range(appt.start, appt.end, ar: ar)}',

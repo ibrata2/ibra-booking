@@ -18,12 +18,23 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OVERLAY = os.path.join(ROOT, "platform")
 PACKAGE = "com.ibraprogram.ibra_booking"
-EDITION = "general" if "--edition=general" in sys.argv or ("--edition" in sys.argv and sys.argv[sys.argv.index("--edition") + 1] == "general") else "events"
+def _arg_edition():
+    for i, a in enumerate(sys.argv):
+        if a.startswith("--edition="):
+            return a.split("=", 1)[1]
+        if a == "--edition" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return "events"
+
+
+EDITION = _arg_edition()
 GENERAL = EDITION == "general"
-# النسخة العامة تُثبَّت بجانب نسخة الفواتح بمعرف مختلف
-APP_ID = "com.ibraprogram.ibra_bookings" if GENERAL else PACKAGE
-NAME_AR = "الحجوزات IBRA" if GENERAL else "حجوزات IBRA"
-NAME_EN = "IBRA Bookings" if GENERAL else "IBRA BOOKING"
+CENTER = EDITION == "center"
+# كل نسخة تُثبَّت بجانب الأخرى بمعرف مختلف
+APP_ID = {"general": "com.ibraprogram.ibra_bookings", "center": "com.ibraprogram.ibra_center"}.get(EDITION, PACKAGE)
+IOS_SUFFIX = {"general": "ibraBookings", "center": "ibraCenter"}.get(EDITION)
+NAME_AR = {"general": "الحجوزات IBRA", "center": "مواعيد المركز IBRA"}.get(EDITION, "حجوزات IBRA")
+NAME_EN = {"general": "IBRA Bookings", "center": "IBRA Center"}.get(EDITION, "IBRA BOOKING")
 
 
 def fail(msg):
@@ -218,11 +229,11 @@ def setup_ios():
         )
         open(sb, "w").write(s)
 
-    if GENERAL:
+    if IOS_SUFFIX:
         pbx = os.path.join(ios, "Runner.xcodeproj", "project.pbxproj")
         if os.path.exists(pbx):
             t = open(pbx).read()
-            t = re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.)ibraBooking\b", r"\1ibraBookings", t)
+            t = re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.)ibraBooking\b", r"\g<1>" + IOS_SUFFIX, t)
             open(pbx, "w").write(t)
 
     podfile = os.path.join(ios, "Podfile")
@@ -237,7 +248,7 @@ if __name__ == "__main__":
     setup_android()
     setup_ios()
     icon_args = [sys.executable, os.path.join(ROOT, "tool", "generate_icons.py"), "--platforms"]
-    if GENERAL and os.path.exists(os.path.join(ROOT, "assets", "icon", "source_general.png")):
-        icon_args.append("--general")
+    if EDITION != "events":
+        icon_args.append("--edition=" + EDITION)
     subprocess.check_call(icon_args)
     print("تم تجهيز المنصات ✔")

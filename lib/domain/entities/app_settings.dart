@@ -28,6 +28,9 @@ class AppSettings {
   final int lastBackupMs;
   final bool onboarded;
 
+  /// نسخة المركز: تنبيهات هذا الجهاز لموظف محدد (0 = كل الموظفين).
+  final int notifyStaffId;
+
   const AppSettings({
     this.language = 'ar',
     this.themeMode = 'system',
@@ -52,6 +55,7 @@ class AppSettings {
     this.autoBackup = true,
     this.lastBackupMs = 0,
     this.onboarded = false,
+    this.notifyStaffId = 0,
   });
 
   bool get isArabic => language == 'ar';
@@ -83,6 +87,7 @@ class AppSettings {
     bool? autoBackup,
     int? lastBackupMs,
     bool? onboarded,
+    int? notifyStaffId,
   }) => AppSettings(
     language: language ?? this.language,
     themeMode: themeMode ?? this.themeMode,
@@ -107,6 +112,7 @@ class AppSettings {
     autoBackup: autoBackup ?? this.autoBackup,
     lastBackupMs: lastBackupMs ?? this.lastBackupMs,
     onboarded: onboarded ?? this.onboarded,
+    notifyStaffId: notifyStaffId ?? this.notifyStaffId,
   );
 
   Map<String, Object?> toJson() => {
@@ -133,6 +139,7 @@ class AppSettings {
     'autoBackup': autoBackup,
     'lastBackupMs': lastBackupMs,
     'onboarded': onboarded,
+    'notifyStaffId': notifyStaffId,
   };
 
   factory AppSettings.fromJson(Map<String, Object?> j) {
@@ -172,6 +179,7 @@ class AppSettings {
       autoBackup: v('autoBackup', d.autoBackup),
       lastBackupMs: i('lastBackupMs', d.lastBackupMs),
       onboarded: v('onboarded', d.onboarded),
+      notifyStaffId: i('notifyStaffId', 0),
     );
   }
 
