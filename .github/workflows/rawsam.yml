@@ -145,6 +145,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Xcode 26 (مطلوب لـ Firebase و App Store)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
