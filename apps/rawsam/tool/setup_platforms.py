@@ -267,7 +267,7 @@ def setup_ios():
                 r"\n\2CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\1",
                 t,
             )
-        t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 14.0;", t)
+        t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 15.0;", t)
         open(pbx, "w").write(t)
 
     sb = os.path.join(ios, "Runner", "Base.lproj", "LaunchScreen.storyboard")
@@ -283,7 +283,7 @@ def setup_ios():
     podfile = os.path.join(ios, "Podfile")
     if os.path.exists(podfile):
         s = open(podfile).read()
-        s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '14.0'", s, count=1)
+        s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s, count=1)
         open(podfile, "w").write(s)
     print("✓ iOS")
 

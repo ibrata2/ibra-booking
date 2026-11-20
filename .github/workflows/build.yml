@@ -4,7 +4,7 @@ name: Build IBRA BOOKING
 # وينشرها تلقائياً في صفحة Releases عند كل رفع إلى main.
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, rawsam-client]
     tags: ['v*']
   workflow_dispatch:
 
@@ -68,6 +68,33 @@ jobs:
       - name: الاختبارات
         run: flutter test
 
+      - name: إعدادات ربط تطبيق الزبائن (نسخة المركز)
+        env:
+          SB_URL: ${{ secrets.RAWSAM_SUPABASE_URL }}
+          SB_KEY: ${{ secrets.RAWSAM_SUPABASE_ANON_KEY }}
+          FB_API_KEY: ${{ secrets.RAWSAM_FB_API_KEY }}
+          FB_SENDER_ID: ${{ secrets.RAWSAM_FB_SENDER_ID }}
+          FB_PROJECT_ID: ${{ secrets.RAWSAM_FB_PROJECT_ID }}
+          FB_CENTER_ANDROID: ${{ secrets.RAWSAM_FB_APP_ID_CENTER_ANDROID }}
+          FB_CENTER_IOS: ${{ secrets.RAWSAM_FB_APP_ID_CENTER_IOS }}
+        run: |
+          if [ "${{ matrix.edition }}" = "center" ]; then
+          cat > defines.json <<EOF
+          {
+            "EDITION": "center",
+            "CLOUD_URL": "$SB_URL",
+            "CLOUD_ANON_KEY": "$SB_KEY",
+            "FB_API_KEY": "$FB_API_KEY",
+            "FB_SENDER_ID": "$FB_SENDER_ID",
+            "FB_PROJECT_ID": "$FB_PROJECT_ID",
+            "FB_APP_ID_CENTER_ANDROID": "$FB_CENTER_ANDROID",
+            "FB_APP_ID_CENTER_IOS": "$FB_CENTER_IOS"
+          }
+          EOF
+          else
+            echo '{"EDITION": "${{ matrix.edition }}"}' > defines.json
+          fi
+
       - name: توقيع الإصدار (اختياري)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -88,13 +115,13 @@ jobs:
         run: |
           # إعادة المحاولة عند ضغط خوادم Maven (429)
           retry() { for n in 1 2 3 4; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
-          retry flutter build apk --release --dart-define=EDITION=${{ matrix.edition }}
-          retry flutter build apk --release --split-per-abi --dart-define=EDITION=${{ matrix.edition }}
+          retry flutter build apk --release --dart-define-from-file=defines.json
+          retry flutter build apk --release --split-per-abi --dart-define-from-file=defines.json
 
       - name: بناء AAB
         run: |
           retry() { for n in 1 2 3 4; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
-          retry flutter build appbundle --release --dart-define=EDITION=${{ matrix.edition }}
+          retry flutter build appbundle --release --dart-define-from-file=defines.json
 
       - name: تجميع الملفات
         run: |
@@ -146,10 +173,37 @@ jobs:
 
       - run: flutter pub get
 
+      - name: إعدادات ربط تطبيق الزبائن (نسخة المركز)
+        env:
+          SB_URL: ${{ secrets.RAWSAM_SUPABASE_URL }}
+          SB_KEY: ${{ secrets.RAWSAM_SUPABASE_ANON_KEY }}
+          FB_API_KEY: ${{ secrets.RAWSAM_FB_API_KEY }}
+          FB_SENDER_ID: ${{ secrets.RAWSAM_FB_SENDER_ID }}
+          FB_PROJECT_ID: ${{ secrets.RAWSAM_FB_PROJECT_ID }}
+          FB_CENTER_ANDROID: ${{ secrets.RAWSAM_FB_APP_ID_CENTER_ANDROID }}
+          FB_CENTER_IOS: ${{ secrets.RAWSAM_FB_APP_ID_CENTER_IOS }}
+        run: |
+          if [ "${{ matrix.edition }}" = "center" ]; then
+          cat > defines.json <<EOF
+          {
+            "EDITION": "center",
+            "CLOUD_URL": "$SB_URL",
+            "CLOUD_ANON_KEY": "$SB_KEY",
+            "FB_API_KEY": "$FB_API_KEY",
+            "FB_SENDER_ID": "$FB_SENDER_ID",
+            "FB_PROJECT_ID": "$FB_PROJECT_ID",
+            "FB_APP_ID_CENTER_ANDROID": "$FB_CENTER_ANDROID",
+            "FB_APP_ID_CENTER_IOS": "$FB_CENTER_IOS"
+          }
+          EOF
+          else
+            echo '{"EDITION": "${{ matrix.edition }}"}' > defines.json
+          fi
+
       - name: بناء iOS بدون توقيع
         run: |
           retry() { for n in 1 2 3; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
-          retry flutter build ios --release --no-codesign --dart-define=EDITION=${{ matrix.edition }}
+          retry flutter build ios --release --no-codesign --dart-define-from-file=defines.json
 
       - name: تجميع IPA ومشروع Xcode
         run: |
@@ -160,7 +214,7 @@ jobs:
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -qry out/$APP-$V-ios-unsigned.ipa Payload
           # مشروع Flutter كامل مع مجلد ios جاهز للفتح في Xcode (Runner.xcworkspace)
-          zip -qry out/$APP-$V-ios-xcode-project.zip . -x "build/*" ".dart_tool/*" "out/*" "Payload/*" ".git/*" "android/.gradle/*" "ios/Pods/*" "ios/.symlinks/*"
+          zip -qry out/$APP-$V-ios-xcode-project.zip . -x "build/*" ".dart_tool/*" "out/*" "Payload/*" ".git/*" "android/.gradle/*" "ios/Pods/*" "ios/.symlinks/*" "apps/*" "defines.json"
           ls -la out
 
       - uses: actions/upload-artifact@v4
@@ -172,7 +226,7 @@ jobs:
     name: نشر الإصدار
     needs: [android, ios]
     # ننشر ما نجح حتى لو تأخر جهاز macOS عند GitHub
-    if: ${{ always() && needs.android.result == 'success' }}
+    if: ${{ always() && needs.android.result == 'success' && github.ref_name != 'rawsam-client' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

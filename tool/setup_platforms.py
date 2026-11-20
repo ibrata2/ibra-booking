@@ -57,6 +57,19 @@ def setup_android():
     if not os.path.isdir(android):
         fail("android/ غير موجود — شغل flutter create أولاً")
     copy_tree(os.path.join(OVERLAY, "android"), android)
+    if CENTER:
+        # نسخة المركز: كاميرا لمسح كوبونات الزبائن + الموقع لتحديد مكان المركز
+        mf = os.path.join(android, "app", "src", "main", "AndroidManifest.xml")
+        t = open(mf).read()
+        extra = (
+            '    <uses-permission android:name="android.permission.CAMERA" />\n'
+            '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+            '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+        )
+        if "android.permission.CAMERA" not in t:
+            t = t.replace("    <uses-permission android:name=\"android.permission.INTERNET\" />\n",
+                          "    <uses-permission android:name=\"android.permission.INTERNET\" />\n" + extra, 1)
+        open(mf, "w").write(t)
     res_main = os.path.join(android, "app", "src", "main", "res")
     for folder, name in (("values", NAME_EN), ("values-ar", NAME_AR)):
         with open(os.path.join(res_main, folder, "strings.xml"), "w") as f:
@@ -214,6 +227,9 @@ def setup_ios():
     pl["NSContactsUsageDescription"] = "لاستيراد الزبائن من جهات الاتصال — To import customers from contacts"
     pl["NSFaceIDUsageDescription"] = "لفتح التطبيق بأمان — To unlock the app securely"
     pl["LSApplicationQueriesSchemes"] = ["tel", "sms", "whatsapp", "https", "comgooglemaps", "maps"]
+    pl["NSCameraUsageDescription"] = "لمسح باركود كوبونات الزبائن — To scan customer coupon codes"
+    pl["NSLocationWhenInUseUsageDescription"] = "لتحديد موقع المركز على الخريطة — To set the center location"
+    pl["NSPhotoLibraryUsageDescription"] = "لاختيار صور الأعمال والمحادثة — To pick photos"
     pl["ITSAppUsesNonExemptEncryption"] = False
     pl["UIStatusBarStyle"] = "UIStatusBarStyleLightContent"
     with open(plist_path, "wb") as f:
@@ -229,17 +245,28 @@ def setup_ios():
         )
         open(sb, "w").write(s)
 
-    if IOS_SUFFIX:
-        pbx = os.path.join(ios, "Runner.xcodeproj", "project.pbxproj")
-        if os.path.exists(pbx):
-            t = open(pbx).read()
+    pbx = os.path.join(ios, "Runner.xcodeproj", "project.pbxproj")
+    if os.path.exists(pbx):
+        t = open(pbx).read()
+        if IOS_SUFFIX:
             t = re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.)ibraBooking\b", r"\g<1>" + IOS_SUFFIX, t)
-            open(pbx, "w").write(t)
+        t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 15.0;", t)
+        if CENTER and "CODE_SIGN_ENTITLEMENTS" not in t:
+            # إشعارات رسائل الزبائن (Push)
+            with open(os.path.join(ios, "Runner", "Runner.entitlements"), "wb") as f:
+                plistlib.dump({"aps-environment": "development"}, f)
+            t = re.sub(
+                r"(\n(\s*)PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.%s;)" % IOS_SUFFIX,
+                r"\n\2CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\1",
+                t,
+            )
+        open(pbx, "w").write(t)
 
     podfile = os.path.join(ios, "Podfile")
     if os.path.exists(podfile):
         s = open(podfile).read()
-        s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '13.0'", s, count=1)
+        # Firebase وماسح الباركود يحتاجون iOS 15
+        s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s, count=1)
         open(podfile, "w").write(s)
     print("✓ iOS")
 

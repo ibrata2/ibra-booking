@@ -14,6 +14,8 @@ import 'settings_screen.dart';
 import 'sounds_screen.dart';
 import 'staff_screen.dart';
 import '../../core/edition.dart';
+import '../../cloud/cloud_providers.dart';
+import '../../cloud/screens/cloud_hub_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -73,6 +75,18 @@ class MoreScreen extends ConsumerWidget {
           ),
           tile(Icons.library_music_rounded, const Color(0xFFEC407A), context.t('sounds'), context.t('sounds_sub'), const SoundsScreen()),
           if (Edition.isCenter) ...[
+            Badge(
+              isLabelVisible: ref.watch(unreadStaffProvider) > 0,
+              label: Text('${ref.watch(unreadStaffProvider)}'),
+              alignment: AlignmentDirectional.topStart,
+              child: tile(
+                Icons.phone_iphone_rounded,
+                const Color(0xFF2F6BFF),
+                'تطبيق الزبائن «روسم للتجميل»',
+                'المحادثات، المنشورات، العروض، الكوبونات',
+                const CloudHubScreen(),
+              ),
+            ),
             tile(Icons.badge_rounded, const Color(0xFF3D7BFF), context.t('staff'), context.t('staff_sub'), const StaffScreen()),
             tile(Icons.spa_rounded, const Color(0xFFEC407A), context.t('services'), context.t('services_sub'), const ServicesScreen()),
           ] else

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'cloud/cloud.dart';
 import 'data/db/app_database.dart';
 import 'data/repositories/sqlite_repositories.dart';
 import 'presentation/providers.dart';
@@ -19,6 +20,10 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
 
   final db = await AppDatabase.open();
+  // نسخة المركز: الربط مع تطبيق الزبائن (إذا كان مُعداً)
+  try {
+    await Cloud.init(db.db);
+  } catch (_) {}
   final settingsRepo = SqliteSettingsRepository(db.db);
   var settings = await settingsRepo.load();
 
