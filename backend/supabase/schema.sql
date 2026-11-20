@@ -439,6 +439,16 @@ begin
   return 'ok';
 end $$;
 
+-- أول موظف يسجل دخول من نسخة المركز يصير المدير تلقائياً (مرة وحدة فقط)
+create or replace function public.claim_first_admin(p_name text) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then return false; end if;
+  if exists(select 1 from staff_members) then return is_staff(); end if;
+  insert into staff_members (user_id, display_name, role) values (auth.uid(), coalesce(nullif(trim(p_name), ''), 'المدير'), 'admin');
+  return true;
+end $$;
+
 -- حذف حساب الزبون مع كل بياناته (متطلب Apple و Google)
 create or replace function public.delete_my_account() returns void
 language plpgsql security definer set search_path = public, auth as $$
@@ -546,6 +556,7 @@ grant execute on function public.coupon_info(text) to authenticated;
 grant execute on function public.redeem_coupon(text) to authenticated;
 grant execute on function public.delete_my_account() to authenticated;
 grant execute on function public.offer_stats() to authenticated;
+grant execute on function public.claim_first_admin(text) to authenticated;
 revoke execute on function public.issue_neighbor_offers() from public, anon, authenticated;
 
 -- =====================================================================

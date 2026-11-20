@@ -47,7 +47,8 @@ jobs:
 
       - name: رقم الإصدار
         id: ver
-        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v5
         with:
