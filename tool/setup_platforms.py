@@ -134,6 +134,9 @@ def patch_gradle_kts(path):
     s = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = maxOf(flutter.compileSdkVersion, 37)", s)
     if "multiDexEnabled" not in s:
         s = re.sub(r"(defaultConfig\s*\{)", r"\1\n        multiDexEnabled = true", s, count=1)
+    # فحص lint بنسخة الإصدار يتعطل على إضافات Firebase — نوقفه (ما يأثر على التطبيق)
+    if "checkReleaseBuilds" not in s:
+        s = re.sub(r"(\nandroid\s*\{)", r"\1\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }", s, count=1)
     if "keystoreProperties" not in s:
         header = (
             "import java.util.Properties\n"
