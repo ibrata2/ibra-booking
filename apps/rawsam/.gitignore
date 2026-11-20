@@ -1,0 +1,31 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+.metadata
+
+# مجلدات المنصات تُولَّد تلقائياً في GitHub Actions (flutter create + tool/setup_platforms.py)
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/web/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# التوقيع — لا ترفعه أبداً
+*.jks
+*.keystore
+key.properties
+dist_assets/
+dist_assets/

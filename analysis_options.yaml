@@ -5,5 +5,7 @@ analyzer:
     - platform/**
     - android/**
     - ios/**
+    - apps/**
+    - backend/**
   errors:
     deprecated_member_use: ignore

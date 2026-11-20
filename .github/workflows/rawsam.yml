@@ -1,0 +1,234 @@
+name: Build روسم للتجميل (تطبيق الزبائن)
+
+# يبني تطبيق الزبائن: نسخة الموقع (APK) ونسخة المتاجر (AAB + APK) ونسخة آيفون،
+# وينشرها في Releases عند الرفع إلى main.
+#
+# الأسرار (Settings → Secrets and variables → Actions) — كلها اختيارية،
+# وبدونها يشتغل التطبيق بوضع العرض:
+#   RAWSAM_SUPABASE_URL, RAWSAM_SUPABASE_ANON_KEY
+#   RAWSAM_FB_API_KEY, RAWSAM_FB_APP_ID_ANDROID, RAWSAM_FB_APP_ID_IOS, RAWSAM_FB_SENDER_ID, RAWSAM_FB_PROJECT_ID
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD  (نفس مفتاح حجوزات IBRA)
+on:
+  push:
+    branches: [main, master, rawsam-client]
+    paths:
+      - 'apps/rawsam/**'
+      - '.github/workflows/rawsam.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rawsam-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP: Rawsam
+
+defaults:
+  run:
+    working-directory: apps/rawsam
+
+jobs:
+  android:
+    name: Android ${{ matrix.dist }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dist: [site, store]
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: رقم الإصدار
+        id: ver
+        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: إنشاء مجلدات المنصات
+        run: flutter create --org com.ibraprogram --project-name rawsam --platforms android,ios .
+
+      - name: تجهيز المنصات والأيقونات
+        run: |
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+          python3 tool/setup_platforms.py
+
+      - run: flutter pub get
+
+      - name: الفحص
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: الاختبارات
+        run: flutter test
+
+      - name: إعدادات الربط
+        env:
+          SB_URL: ${{ secrets.RAWSAM_SUPABASE_URL }}
+          SB_KEY: ${{ secrets.RAWSAM_SUPABASE_ANON_KEY }}
+          FB_API_KEY: ${{ secrets.RAWSAM_FB_API_KEY }}
+          FB_APP_ID_ANDROID: ${{ secrets.RAWSAM_FB_APP_ID_ANDROID }}
+          FB_APP_ID_IOS: ${{ secrets.RAWSAM_FB_APP_ID_IOS }}
+          FB_SENDER_ID: ${{ secrets.RAWSAM_FB_SENDER_ID }}
+          FB_PROJECT_ID: ${{ secrets.RAWSAM_FB_PROJECT_ID }}
+        run: |
+          cat > defines.json <<EOF
+          {
+            "DIST": "${{ matrix.dist }}",
+            "SUPABASE_URL": "$SB_URL",
+            "SUPABASE_ANON_KEY": "$SB_KEY",
+            "FB_API_KEY": "$FB_API_KEY",
+            "FB_APP_ID_ANDROID": "$FB_APP_ID_ANDROID",
+            "FB_APP_ID_IOS": "$FB_APP_ID_IOS",
+            "FB_SENDER_ID": "$FB_SENDER_ID",
+            "FB_PROJECT_ID": "$FB_PROJECT_ID"
+          }
+          EOF
+          if [ -n "$SB_URL" ]; then echo "✓ مربوط بقاعدة البيانات"; else echo "⚠ بدون Supabase — وضع العرض"; fi
+
+      - name: توقيع الإصدار (اختياري)
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: بناء أندرويد
+        run: |
+          retry() { for n in 1 2 3 4; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
+          V=${{ steps.ver.outputs.version }}
+          BN=${{ github.run_number }}
+          mkdir -p out
+          retry flutter build apk --release --build-number=$BN --dart-define-from-file=defines.json
+          if [ "${{ matrix.dist }}" = "store" ]; then
+            retry flutter build appbundle --release --build-number=$BN --dart-define-from-file=defines.json
+            cp build/app/outputs/bundle/release/app-release.aab out/$APP-$V-google-play.aab
+            cp build/app/outputs/flutter-apk/app-release.apk out/$APP-$V-store-test.apk
+          else
+            cp build/app/outputs/flutter-apk/app-release.apk out/$APP-$V-android.apk
+          fi
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rawsam-android-${{ matrix.dist }}
+          path: apps/rawsam/out/*
+
+  ios:
+    name: iOS
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: إنشاء مجلدات المنصات
+        run: flutter create --org com.ibraprogram --project-name rawsam --platforms android,ios .
+
+      - name: تجهيز المنصات والأيقونات
+        run: |
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+          python3 tool/setup_platforms.py
+
+      - run: flutter pub get
+
+      - name: إعدادات الربط
+        env:
+          SB_URL: ${{ secrets.RAWSAM_SUPABASE_URL }}
+          SB_KEY: ${{ secrets.RAWSAM_SUPABASE_ANON_KEY }}
+          FB_API_KEY: ${{ secrets.RAWSAM_FB_API_KEY }}
+          FB_APP_ID_ANDROID: ${{ secrets.RAWSAM_FB_APP_ID_ANDROID }}
+          FB_APP_ID_IOS: ${{ secrets.RAWSAM_FB_APP_ID_IOS }}
+          FB_SENDER_ID: ${{ secrets.RAWSAM_FB_SENDER_ID }}
+          FB_PROJECT_ID: ${{ secrets.RAWSAM_FB_PROJECT_ID }}
+        run: |
+          cat > defines.json <<EOF
+          {
+            "DIST": "store",
+            "SUPABASE_URL": "$SB_URL",
+            "SUPABASE_ANON_KEY": "$SB_KEY",
+            "FB_API_KEY": "$FB_API_KEY",
+            "FB_APP_ID_ANDROID": "$FB_APP_ID_ANDROID",
+            "FB_APP_ID_IOS": "$FB_APP_ID_IOS",
+            "FB_SENDER_ID": "$FB_SENDER_ID",
+            "FB_PROJECT_ID": "$FB_PROJECT_ID"
+          }
+          EOF
+
+      - name: بناء iOS بدون توقيع
+        run: |
+          retry() { for n in 1 2 3; do "$@" && return 0; echo "إعادة المحاولة $n…"; sleep $((n * 45)); done; return 1; }
+          retry flutter build ios --release --no-codesign --build-number=${{ github.run_number }} --dart-define-from-file=defines.json
+
+      - name: تجميع IPA ومشروع Xcode
+        run: |
+          V=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          mkdir -p out Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry out/$APP-$V-ios-unsigned.ipa Payload
+          zip -qry out/$APP-$V-ios-xcode-project.zip . -x "build/*" ".dart_tool/*" "out/*" "Payload/*" "ios/Pods/*" "ios/.symlinks/*" "defines.json"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rawsam-ios
+          path: apps/rawsam/out/*
+
+  release:
+    name: نشر الإصدار
+    needs: [android, ios]
+    if: ${{ always() && needs.android.result == 'success' && (github.ref_name == 'main' || github.ref_name == 'master') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rawsam-*
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rawsam-v${{ needs.android.outputs.version }}
+          name: روسم للتجميل v${{ needs.android.outputs.version }} — تطبيق الزبائن
+          body: |
+            ## 🌸 روسم للتجميل — تطبيق الزبائن
+
+            أعمالنا، المنشورات والعروض، المحادثة والحجز ويا المركز، الهدايا بالباركود، عروض القرب، و«وصّلني» بصوت توجيه.
+
+            - **أندرويد (للموقع):** `Rawsam-*-android.apk`
+            - **Google Play:** `Rawsam-*-google-play.aab`
+            - **آيفون:** `Rawsam-*-ios-unsigned.ipa` (يحتاج توقيع) و `ios-xcode-project.zip` للرفع على App Store.
+
+            برمجة وتطوير ابراهيم الخزرجي — https://ibraprogram.netlify.app/
+          files: dist/*
+          make_latest: false
