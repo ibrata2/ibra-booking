@@ -78,4 +78,4 @@ flutter build ios --release --no-codesign   # على Mac
 ## المتطلبات
 - Flutter stable حديث (3.44 أو أحدث)، Dart 3.8+
 - Android 7.0 (API 24) فما فوق
-- iOS 13 فما فوق
+- iOS 15 فما فوق
