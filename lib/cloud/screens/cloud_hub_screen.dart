@@ -136,7 +136,7 @@ class _Hub extends ConsumerWidget {
           tile(Icons.forum_rounded, const Color(0xFF2F6BFF), 'المحادثات', 'رد على الزبائن وسجّل حجوزاتهم', () => go(const InboxScreen()), badge: unread),
           tile(Icons.qr_code_scanner_rounded, const Color(0xFF00C853), 'مسح كوبون', 'امسح باركود الهدية أو اكتب الكود', () => go(const ScanScreen())),
           tile(Icons.campaign_rounded, const Color(0xFFEC407A), 'المنشورات والعروض', 'الصق رابط انستا/فيس أو اكتب عرض — يوصل إشعار للكل', () => go(const PostsScreen())),
-          tile(Icons.card_giftcard_rounded, const Color(0xFFFFA000), 'عروض القرب والجيران', 'خصومات تلقائية بالكود والباركود', () => go(const OffersScreen())),
+          tile(Icons.card_giftcard_rounded, const Color(0xFFFFA000), 'العروض والهدايا', 'عروض القرب، تحدد منو يستلم، وتشوف منو استلم', () => go(const OffersScreen())),
           tile(Icons.photo_library_rounded, const Color(0xFF7C4DFF), 'أعمالنا', 'صور الشغل اللي تطلع للزبائن', () => go(const WorksAdminScreen())),
           tile(Icons.storefront_rounded, const Color(0xFF00ACC1), 'معلومات المركز', 'الموقع، أصوات التوجيه، خطوات المول، إظهار الأسماء', () => go(const CenterSettingsScreen())),
           tile(Icons.sync_rounded, const Color(0xFF78909C), 'مزامنة الخدمات', 'ترفع خدمات المركز وأسعارها للتطبيق', () => _syncServices(context, ref)),

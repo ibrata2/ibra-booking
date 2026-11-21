@@ -240,25 +240,6 @@ class _NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<_NotificationsScreen> {
-  bool _detecting = false;
-
-  Future<void> _setTier(String? t) async {
-    await ref.read(profileProvider.notifier).save(ref.read(profileProvider).copyWith(neighborTier: t, clearTier: t == null));
-  }
-
-  Future<void> _detect() async {
-    setState(() => _detecting = true);
-    try {
-      final t = await ProximityService.detectNeighborTier(centerOf(ref));
-      await _setTier(t);
-      if (mounted) toast(context, t == null ? 'موقعك بعيد شوية عن المركز' : 'تم: ${neighborTiers[t]}');
-    } catch (_) {
-      if (mounted) toast(context, 'ما كدرنا نحدد الموقع — اختار من القائمة');
-    } finally {
-      if (mounted) setState(() => _detecting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = ref.watch(profileProvider);
@@ -293,33 +274,6 @@ class _NotificationsScreenState extends ConsumerState<_NotificationsScreen> {
                 },
                 child: const Text('إيقاف عروض القرب'),
               ),
-            const SectionTitle('جيران المركز 🏠'),
-            Text(
-              'إذا بيتك قريب من المركز يوصلك عرض خاص للجيران بشكل دوري. نحفظ بس الشريحة (نفس البناية / قريب / نفس المنطقة)، مو موقعك.',
-              style: TextStyle(height: 1.55, color: Colors.white.withValues(alpha: 0.7)),
-            ),
-            const SizedBox(height: 10),
-            Glass(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: RadioGroup<String>(
-                groupValue: p.neighborTier ?? 'none',
-                onChanged: (v) => _setTier(v == 'none' ? null : v),
-                child: Column(
-                  children: [
-                    for (final e in neighborTiers.entries) RadioListTile<String>(value: e.key, title: Text(e.value)),
-                    const RadioListTile<String>(value: 'none', title: Text('بعيد / ما أريد')),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _detecting ? null : _detect,
-              icon: _detecting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.my_location_rounded),
-              label: const Text('حدد تلقائياً من موقعي الحالي (وأنا بالبيت)'),
-            ),
           ],
         ),
       ),

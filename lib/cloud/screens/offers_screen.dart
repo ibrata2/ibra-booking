@@ -6,8 +6,9 @@ import '../../presentation/widgets/common.dart';
 import '../cloud.dart';
 import '../cloud_providers.dart';
 
-/// العروض الذكية: عرض القرب (من يمر قريب)، عروض الجيران الدورية، وعروض عامة تُرسل فوراً.
-/// كل عرض يوصل للزبون ككوبون بكود وباركود ينستخدم مرة وحدة.
+/// العروض: عرض القرب (يوصل من يمر الزبون قريب) وعرض عام (ترسله بنفسك).
+/// كل عرض يوصل للزبون مرة وحدة بس، وتحدد منو يستلمه ومنو لا.
+/// الزبون اللي عنده هدية قرب صالحة ما يستلم غيرها لحد ما تنتهي أو يستخدمها، وبعدها يستلم العرض الجاي.
 class OffersScreen extends ConsumerWidget {
   const OffersScreen({super.key});
 
@@ -22,10 +23,10 @@ class OffersScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('عروض القرب والجيران')),
+      appBar: AppBar(title: const Text('العروض والهدايا')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          if (await showOfferEditor(context) == true) refresh();
+          if (await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const OfferEditor())) == true) refresh();
         },
         icon: const Icon(Icons.add_rounded),
         label: const Text('عرض جديد'),
@@ -41,9 +42,12 @@ class OffersScreen extends ConsumerWidget {
               ...offers.when(
                 loading: () => [const Center(child: CircularProgressIndicator())],
                 error: (e, _) => [EmptyState(icon: Icons.wifi_off_rounded, text: '$e')],
-                data: (list) => list.isEmpty
-                    ? [const EmptyState(icon: Icons.card_giftcard_outlined, text: 'ضيف أول عرض، مثلاً:\n«مدام صرت قريب… مر علينا والك خصم 10%»')]
-                    : [for (final o in list) _OfferTile(o: o, stat: stats[(o['id'] as num).toInt()], onChanged: refresh)],
+                data: (all) {
+                  final list = all.where((o) => o['kind'] != 'neighbor').toList();
+                  return list.isEmpty
+                      ? [const EmptyState(icon: Icons.card_giftcard_outlined, text: 'ضيف أول عرض، مثلاً:\n«مدام صرت قريب… مر علينا والك خصم 10%»')]
+                      : [for (final o in list) _OfferTile(o: o, stat: stats[(o['id'] as num).toInt()], onChanged: refresh)];
+                },
               ),
             ],
           ),
@@ -51,6 +55,15 @@ class OffersScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String audienceLabel(CRow o) {
+  final n = ((o['target_ids'] as List?) ?? const []).length;
+  return switch (o['audience']) {
+    'only' => '👥 بس $n زبون محدد',
+    'except' => '👥 الكل ماعدا $n',
+    _ => '👥 كل الزبائن',
+  };
 }
 
 class _OfferTile extends StatelessWidget {
@@ -63,20 +76,20 @@ class _OfferTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final kind = o['kind'] as String;
     final active = o['active'] == true;
-    final label = switch (kind) {
-      'proximity' => '📍 عرض القرب',
-      'neighbor' => '🏠 عرض الجيران — كل ${o['every_days']} يوم',
-      _ => '📣 عرض عام',
-    };
-    final tiers = ((o['neighbor_tiers'] as List?) ?? const []).map((t) => kNeighborTiers[t] ?? t).join('، ');
     return Glass(
       margin: const EdgeInsets.only(bottom: 10),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OfferRecipientsScreen(offer: o))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFFFA000)))),
+              Expanded(
+                child: Text(
+                  kind == 'proximity' ? '📍 عرض القرب' : '📣 عرض ترسله بنفسك',
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFFFA000)),
+                ),
+              ),
               Switch(
                 value: active,
                 onChanged: (v) async {
@@ -89,34 +102,25 @@ class _OfferTile extends StatelessWidget {
           Text(o['title'] as String? ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           if ((o['discount_text'] as String? ?? '').isNotEmpty)
             Text(o['discount_text'] as String, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF00C853))),
-          if (kind == 'neighbor' && tiers.isNotEmpty) Text('للـ: $tiers', style: TextStyle(color: Theme.of(context).hintColor)),
+          Text(audienceLabel(o), style: TextStyle(color: Theme.of(context).hintColor)),
           const SizedBox(height: 6),
           Row(
             children: [
-              Text(
-                'انرسل ${stat?.$1 ?? 0} — استُخدم ${stat?.$2 ?? 0} — صالح ${o['valid_days']} يوم',
-                style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
+              Expanded(
+                child: Text(
+                  'استلمه ${stat?.$1 ?? 0} — استخدمه ${stat?.$2 ?? 0} — صالح ${o['valid_days']} يوم',
+                  style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
+                ),
               ),
-              const Spacer(),
-              if (kind != 'proximity' && active)
+              if (active)
                 TextButton.icon(
-                  onPressed: () async {
-                    final who = kind == 'neighbor' ? 'الجيران المطابقين' : 'كل الزبائن';
-                    if (!await confirmDialog(context, title: 'إرسال الآن', message: 'ينرسل كوبون لـ $who فوراً؟', ok: 'أرسل')) return;
-                    try {
-                      final n = await Cloud.db.rpc('issue_offer_now', params: {'p_offer': o['id']});
-                      if (context.mounted) toast(context, 'انرسل لـ $n زبون 🎁');
-                      onChanged();
-                    } catch (e) {
-                      if (context.mounted) toast(context, 'ما انرسل: $e');
-                    }
-                  },
+                  onPressed: () => sendOfferNow(context, o, onChanged),
                   icon: const Icon(Icons.send_rounded, size: 18),
                   label: const Text('أرسل الآن'),
                 ),
               IconButton(
                 onPressed: () async {
-                  if (!await confirmDialog(context, title: 'حذف العرض', message: 'الكوبونات اللي انرسلت تبقى صالحة لحد ما تنتهي.', danger: true)) {
+                  if (!await confirmDialog(context, title: 'حذف العرض', message: 'الهدايا اللي انرسلت تبقى صالحة لحد ما تنتهي.', danger: true)) {
                     return;
                   }
                   await Cloud.db.from('offers').delete().eq('id', o['id'] as Object);
@@ -132,7 +136,111 @@ class _OfferTile extends StatelessWidget {
   }
 }
 
-/// إعدادات عرض القرب: المسافة، الساعات، والتكرار لنفس الزبون.
+Future<void> sendOfferNow(BuildContext context, CRow o, VoidCallback onDone) async {
+  if (!await confirmDialog(
+    context,
+    title: 'أرسل الآن',
+    message: 'ينرسل للي ما استلموا هالعرض بعد (${audienceLabel(o)})، ويوصلهم إشعار.\nاللي استلموه قبل ما يوصلهم مرة ثانية.',
+    ok: 'أرسل',
+  )) {
+    return;
+  }
+  try {
+    final n = await Cloud.db.rpc('issue_offer_now', params: {'p_offer': o['id']});
+    if (context.mounted) toast(context, n == 0 ? 'كلهم مستلمين هالعرض من قبل' : 'انرسل لـ $n زبون 🎁');
+    onDone();
+  } catch (e) {
+    if (context.mounted) toast(context, 'ما انرسل: $e');
+  }
+}
+
+/// منو استلم العرض ومنو لا.
+class OfferRecipientsScreen extends StatefulWidget {
+  const OfferRecipientsScreen({super.key, required this.offer});
+  final CRow offer;
+  @override
+  State<OfferRecipientsScreen> createState() => _OfferRecipientsScreenState();
+}
+
+class _OfferRecipientsScreenState extends State<OfferRecipientsScreen> {
+  late Future<List<CRow>> _rows = _load();
+
+  Future<List<CRow>> _load() async {
+    final r = await Cloud.db.rpc('offer_recipients', params: {'p_offer': widget.offer['id']});
+    return [for (final e in (r as List)) Map<String, dynamic>.from(e as Map)];
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(widget.offer['title'] as String? ?? 'العرض'),
+      actions: [
+        IconButton(
+          tooltip: 'تعديل منو يستلم',
+          onPressed: () async {
+            final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => OfferEditor(offer: widget.offer)));
+            if (ok == true && context.mounted) Navigator.pop(context);
+          },
+          icon: const Icon(Icons.edit_rounded),
+        ),
+      ],
+    ),
+    body: AppBackground(
+      child: FutureBuilder<List<CRow>>(
+        future: _rows,
+        builder: (context, s) {
+          if (s.hasError) return EmptyState(icon: Icons.error_outline, text: '${s.error}');
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          final got = s.data!.where((r) => r['code'] != null).toList();
+          final waiting = s.data!.where((r) => r['code'] == null && r['allowed'] == true).toList();
+          final blocked = s.data!.where((r) => r['code'] == null && r['allowed'] != true).toList();
+          String st(String? x) => switch (x) {
+            'used' => '✅ استخدمه',
+            'expired' => '⌛ انتهى',
+            _ => '🎁 عنده (صالح)',
+          };
+          Widget row(CRow r, String trailing) => ListTile(
+            dense: true,
+            title: Text(r['name'] as String? ?? ''),
+            subtitle: Text(r['phone'] as String? ?? '', textDirection: TextDirection.ltr, textAlign: TextAlign.end),
+            trailing: Text(trailing),
+          );
+          return RefreshIndicator(
+            onRefresh: () async => setState(() => _rows = _load()),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 40),
+              children: [
+                Glass(
+                  child: Row(
+                    children: [
+                      Expanded(child: Text('استلمه ${got.length} — ينتظر ${waiting.length} — مستثنى ${blocked.length}')),
+                      if (widget.offer['active'] == true && waiting.isNotEmpty)
+                        FilledButton.icon(
+                          onPressed: () => sendOfferNow(context, widget.offer, () => setState(() => _rows = _load())),
+                          icon: const Icon(Icons.send_rounded, size: 18),
+                          label: const Text('أرسل للباقين'),
+                        ),
+                    ],
+                  ),
+                ),
+                SectionTitle('استلموه (${got.length})'),
+                for (final r in got) row(r, st(r['status'] as String?)),
+                SectionTitle('ما استلموه بعد (${waiting.length})'),
+                for (final r in waiting) row(r, '⏳'),
+                if (blocked.isNotEmpty) ...[
+                  SectionTitle('مستثنين من هالعرض (${blocked.length})'),
+                  for (final r in blocked) row(r, '🚫'),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+/// إعدادات عرض القرب: المسافة والساعات.
 class _ProximitySettings extends StatefulWidget {
   const _ProximitySettings({required this.row});
   final CRow row;
@@ -145,9 +253,6 @@ class _ProximitySettingsState extends State<_ProximitySettings> {
   double? _radius;
   int? _from;
   int? _to;
-  int? _cooldown;
-
-  bool get _loaded => widget.row.isNotEmpty;
 
   Future<void> _save(Map<String, Object?> patch) async {
     try {
@@ -166,13 +271,12 @@ class _ProximitySettingsState extends State<_ProximitySettings> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) return const SizedBox.shrink();
     final r = widget.row;
+    if (r.isEmpty) return const SizedBox.shrink();
     final enabled = _enabled ?? (r['proximity_enabled'] != false);
     final radius = _radius ?? ((r['proximity_radius_m'] as num?) ?? 500).toDouble();
     final from = _from ?? ((r['proximity_from_min'] as num?) ?? 600).toInt();
     final to = _to ?? ((r['proximity_to_min'] as num?) ?? 1260).toInt();
-    final cooldown = _cooldown ?? ((r['proximity_cooldown_d'] as num?) ?? 7).toInt();
     return Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,21 +329,9 @@ class _ProximitySettingsState extends State<_ProximitySettings> {
             ],
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<int>(
-            initialValue: [1, 3, 7, 14, 30].contains(cooldown) ? cooldown : 7,
-            decoration: const InputDecoration(labelText: 'لنفس الزبون مرة وحدة كل'),
-            items: const [
-              DropdownMenuItem(value: 1, child: Text('يوم')),
-              DropdownMenuItem(value: 3, child: Text('3 أيام')),
-              DropdownMenuItem(value: 7, child: Text('أسبوع')),
-              DropdownMenuItem(value: 14, child: Text('أسبوعين')),
-              DropdownMenuItem(value: 30, child: Text('شهر')),
-            ],
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() => _cooldown = v);
-              _save({'proximity_cooldown_d': v});
-            },
+          Text(
+            'كل عرض يوصل للزبون مرة وحدة بس. إذا عنده هدية قرب صالحة، ما يوصله العرض الجاي إلا بعد ما يستخدمها أو تنتهي.',
+            style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
           ),
         ],
       ),
@@ -247,27 +339,26 @@ class _ProximitySettingsState extends State<_ProximitySettings> {
   }
 }
 
-Future<bool?> showOfferEditor(BuildContext context) => showModalBottomSheet<bool>(
-  context: context,
-  isScrollControlled: true,
-  builder: (_) => const _OfferEditor(),
-);
-
-class _OfferEditor extends StatefulWidget {
-  const _OfferEditor();
+/// إضافة/تعديل عرض مع اختيار منو يستلمه.
+class OfferEditor extends ConsumerStatefulWidget {
+  const OfferEditor({super.key, this.offer});
+  final CRow? offer;
   @override
-  State<_OfferEditor> createState() => _OfferEditorState();
+  ConsumerState<OfferEditor> createState() => _OfferEditorState();
 }
 
-class _OfferEditorState extends State<_OfferEditor> {
-  String _kind = 'proximity';
-  final _title = TextEditingController(text: 'مدام صرت قريب على روسم… مر علينا 🌸');
-  final _discount = TextEditingController(text: 'خصم 10%');
-  final _body = TextEditingController();
-  final _tiers = <String>{'building', 'near'};
-  int _every = 30;
-  int _valid = 3;
+class _OfferEditorState extends ConsumerState<OfferEditor> {
+  late String _kind = widget.offer?['kind'] as String? ?? 'proximity';
+  late final _title = TextEditingController(text: widget.offer?['title'] as String? ?? 'مدام صرت قريب على روسم… مر علينا 🌸');
+  late final _discount = TextEditingController(text: widget.offer?['discount_text'] as String? ?? 'خصم 10%');
+  late final _body = TextEditingController(text: widget.offer?['body'] as String? ?? '');
+  late String _audience = widget.offer?['audience'] as String? ?? 'all';
+  late final Set<String> _targets = {...((widget.offer?['target_ids'] as List?) ?? const []).map((e) => '$e')};
+  late int _valid = (widget.offer?['valid_days'] as num?)?.toInt() ?? 3;
+  String _search = '';
   bool _busy = false;
+
+  bool get _editing => widget.offer != null;
 
   @override
   void dispose() {
@@ -277,36 +368,29 @@ class _OfferEditorState extends State<_OfferEditor> {
     super.dispose();
   }
 
-  void _setKind(String k) {
-    setState(() {
-      _kind = k;
-      if (k == 'proximity') {
-        _title.text = 'مدام صرت قريب على روسم… مر علينا 🌸';
-        _valid = 3;
-      } else if (k == 'neighbor') {
-        _title.text = 'هدية الجيران الشهرية 🏠';
-        _valid = 14;
-      } else {
-        _title.text = 'عرض خاص إلك 🎁';
-        _valid = 7;
-      }
-    });
-  }
-
   Future<void> _save() async {
     if (_title.text.trim().isEmpty) return;
+    if (_audience != 'all' && _targets.isEmpty) {
+      toast(context, 'اختار الزبائن من القائمة');
+      return;
+    }
     setState(() => _busy = true);
+    final row = {
+      'kind': _kind,
+      'title': _title.text.trim(),
+      'discount_text': _discount.text.trim(),
+      'body': _body.text.trim(),
+      'audience': _audience,
+      'target_ids': _audience == 'all' ? <String>[] : _targets.toList(),
+      'valid_days': _valid,
+      'sound': 'rs_gift',
+    };
     try {
-      await Cloud.db.from('offers').insert({
-        'kind': _kind,
-        'title': _title.text.trim(),
-        'discount_text': _discount.text.trim(),
-        'body': _body.text.trim(),
-        'neighbor_tiers': _kind == 'neighbor' ? _tiers.toList() : <String>[],
-        'every_days': _every,
-        'valid_days': _valid,
-        'sound': 'rs_gift',
-      });
+      if (_editing) {
+        await Cloud.db.from('offers').update(row).eq('id', widget.offer!['id'] as Object);
+      } else {
+        await Cloud.db.from('offers').insert(row);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) toast(context, 'ما انحفظ: $e');
@@ -316,80 +400,98 @@ class _OfferEditorState extends State<_OfferEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
-    child: SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('عرض جديد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'proximity', label: Text('القرب')),
-              ButtonSegment(value: 'neighbor', label: Text('الجيران')),
-              ButtonSegment(value: 'general', label: Text('عام')),
-            ],
-            selected: {_kind},
-            onSelectionChanged: (s) => _setKind(s.first),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            switch (_kind) {
-              'proximity' => 'يوصل للزبون من يمر قريب من المركز (حسب الإعدادات فوق).',
-              'neighbor' => 'يوصل تلقائياً للي بيوتهم قريبة، بشكل دوري.',
-              _ => 'ترسله بنفسك لكل الزبائن بزر «أرسل الآن».',
-            },
-            style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
-          ),
-          const SizedBox(height: 12),
-          TextField(controller: _title, decoration: const InputDecoration(labelText: 'نص العرض')),
-          const SizedBox(height: 10),
-          TextField(controller: _discount, decoration: const InputDecoration(labelText: 'الخصم (مثلاً: خصم 10%)')),
-          const SizedBox(height: 10),
-          TextField(controller: _body, decoration: const InputDecoration(labelText: 'ملاحظة (اختيارية)')),
-          if (_kind == 'neighbor') ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final e in kNeighborTiers.entries)
-                  FilterChip(
-                    label: Text(e.value),
-                    selected: _tiers.contains(e.key),
-                    onSelected: (v) => setState(() => v ? _tiers.add(e.key) : _tiers.remove(e.key)),
-                  ),
+  Widget build(BuildContext context) {
+    final customers = (ref.watch(cloudCustomersProvider).value ?? const <String, CRow>{}).values
+        .where((c) => (c['name'] as String? ?? '').isNotEmpty)
+        .where((c) => _search.isEmpty || '${c['name']} ${c['phone']}'.contains(_search))
+        .toList()
+      ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
+    return Scaffold(
+      appBar: AppBar(title: Text(_editing ? 'تعديل العرض' : 'عرض جديد')),
+      body: AppBackground(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+          children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'proximity', label: Text('📍 عرض القرب')),
+                ButtonSegment(value: 'general', label: Text('📣 أرسله بنفسي')),
               ],
+              selected: {_kind},
+              onSelectionChanged: (s) => setState(() {
+                _kind = s.first;
+                if (!_editing) _title.text = _kind == 'proximity' ? 'مدام صرت قريب على روسم… مر علينا 🌸' : 'عرض خاص إلك 🎁';
+              }),
             ),
+            const SizedBox(height: 6),
+            Text(
+              _kind == 'proximity'
+                  ? 'يوصل للزبون تلقائياً من يمر قريب من المركز، وتكدر هم ترسله فوراً بزر «أرسل الآن».'
+                  : 'ترسله بنفسك بزر «أرسل الآن» للزبائن اللي تختارهم.',
+              style: TextStyle(fontSize: 12.5, color: Theme.of(context).hintColor),
+            ),
+            const SizedBox(height: 12),
+            TextField(controller: _title, decoration: const InputDecoration(labelText: 'نص العرض')),
+            const SizedBox(height: 10),
+            TextField(controller: _discount, decoration: const InputDecoration(labelText: 'الخصم (مثلاً: خصم 10%)')),
+            const SizedBox(height: 10),
+            TextField(controller: _body, decoration: const InputDecoration(labelText: 'ملاحظة (اختيارية)')),
+            const SizedBox(height: 10),
             DropdownButtonFormField<int>(
-              initialValue: _every,
-              decoration: const InputDecoration(labelText: 'يتكرر كل'),
+              initialValue: [1, 3, 7, 14, 30].contains(_valid) ? _valid : 7,
+              decoration: const InputDecoration(labelText: 'الهدية صالحة لمدة'),
               items: const [
+                DropdownMenuItem(value: 1, child: Text('يوم')),
+                DropdownMenuItem(value: 3, child: Text('3 أيام')),
                 DropdownMenuItem(value: 7, child: Text('أسبوع')),
                 DropdownMenuItem(value: 14, child: Text('أسبوعين')),
                 DropdownMenuItem(value: 30, child: Text('شهر')),
-                DropdownMenuItem(value: 60, child: Text('شهرين')),
               ],
-              onChanged: (v) => setState(() => _every = v ?? 30),
+              onChanged: (v) => setState(() => _valid = v ?? 7),
             ),
-          ],
-          const SizedBox(height: 10),
-          DropdownButtonFormField<int>(
-            initialValue: _valid,
-            decoration: const InputDecoration(labelText: 'الكوبون صالح لمدة'),
-            items: const [
-              DropdownMenuItem(value: 1, child: Text('يوم')),
-              DropdownMenuItem(value: 3, child: Text('3 أيام')),
-              DropdownMenuItem(value: 7, child: Text('أسبوع')),
-              DropdownMenuItem(value: 14, child: Text('أسبوعين')),
-              DropdownMenuItem(value: 30, child: Text('شهر')),
+            const SectionTitle('منو يستلم العرض'),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'all', label: Text('الكل')),
+                ButtonSegment(value: 'only', label: Text('بس المحددين')),
+                ButtonSegment(value: 'except', label: Text('الكل ماعدا')),
+              ],
+              selected: {_audience},
+              onSelectionChanged: (s) => setState(() => _audience = s.first),
+            ),
+            if (_audience != 'all') ...[
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'ابحث بالاسم أو الرقم'),
+                onChanged: (v) => setState(() => _search = v.trim()),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_audience == 'only' ? 'المحددين يستلمون' : 'المحددين ما يستلمون'} — مختار ${_targets.length}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Glass(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    if (customers.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('ماكو زبائن بعد')),
+                    for (final c in customers)
+                      CheckboxListTile(
+                        dense: true,
+                        value: _targets.contains(c['id']),
+                        title: Text(c['name'] as String),
+                        subtitle: Text(c['phone'] as String? ?? '', textDirection: TextDirection.ltr, textAlign: TextAlign.end),
+                        onChanged: (v) => setState(() => v == true ? _targets.add(c['id'] as String) : _targets.remove(c['id'])),
+                      ),
+                  ],
+                ),
+              ),
             ],
-            onChanged: (v) => setState(() => _valid = v ?? 7),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: _busy ? null : _save, child: const Text('حفظ العرض')),
-        ],
+            const SizedBox(height: 20),
+            FilledButton(onPressed: _busy ? null : _save, child: Text(_editing ? 'حفظ التعديل' : 'حفظ العرض')),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

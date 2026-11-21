@@ -141,10 +141,10 @@ async function handle(table: string, op: string, r: Record<string, any>) {
     }
     case "coupons": {
       if (op !== "INSERT") return;
+      if (r.via === "near") return; // الزبون مر قريب — جهازه نبّهه محلياً
       let sound = "rs_gift";
       if (r.offer_id) {
-        const { data: o } = await sb.from("offers").select("kind,sound").eq("id", r.offer_id).single();
-        if (o?.kind === "proximity") return; // جهاز الزبون نبّهه محلياً
+        const { data: o } = await sb.from("offers").select("sound").eq("id", r.offer_id).single();
         sound = o?.sound || sound;
       }
       await sendToUser(r.customer_id, "customer", {

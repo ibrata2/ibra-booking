@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:geolocator/geolocator.dart';
 import 'package:native_geofence/native_geofence.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -131,21 +129,5 @@ class ProximityService {
     } catch (_) {
       return null;
     }
-  }
-
-  /// تحديد «جار المركز» مرة وحدة من موقع الجهاز الحالي — يُحسب على الجهاز ولا نرسل الموقع،
-  /// فقط الشريحة (نفس البناية / قريب / نفس المنطقة).
-  static Future<String?> detectNeighborTier(CenterInfo c) async {
-    var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
-    if (p == LocationPermission.denied || p == LocationPermission.deniedForever) throw const PermissionDeniedException('location');
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: LocationSettings(accuracy: Platform.isIOS ? LocationAccuracy.best : LocationAccuracy.high, timeLimit: const Duration(seconds: 20)),
-    );
-    final d = Geolocator.distanceBetween(pos.latitude, pos.longitude, c.lat, c.lng);
-    if (d <= 90) return 'building';
-    if (d <= 1000) return 'near';
-    if (d <= 4000) return 'area';
-    return null;
   }
 }
