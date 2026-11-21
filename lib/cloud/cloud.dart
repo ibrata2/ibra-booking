@@ -116,10 +116,14 @@ class Cloud {
 
   // ------------------------------------------------------------ الإشعارات
 
-  static const _fbApiKey = String.fromEnvironment('FB_API_KEY');
-  static const _fbSender = String.fromEnvironment('FB_SENDER_ID');
-  static const _fbProject = String.fromEnvironment('FB_PROJECT_ID');
-  static const _fbAndroid = String.fromEnvironment('FB_APP_ID_CENTER_ANDROID');
+  static const _fbApiKeyEnv = String.fromEnvironment('FB_API_KEY');
+  static const _fbApiKey = _fbApiKeyEnv == '' ? 'AIzaSyArRq8gXYYVeiIpI_NrV7lhYtQXmbMpOfU' : _fbApiKeyEnv;
+  static const _fbSenderEnv = String.fromEnvironment('FB_SENDER_ID');
+  static const _fbSender = _fbSenderEnv == '' ? '81201229438' : _fbSenderEnv;
+  static const _fbProjectEnv = String.fromEnvironment('FB_PROJECT_ID');
+  static const _fbProject = _fbProjectEnv == '' ? 'rawsam-app' : _fbProjectEnv;
+  static const _fbAndroidEnv = String.fromEnvironment('FB_APP_ID_CENTER_ANDROID');
+  static const _fbAndroid = _fbAndroidEnv == '' ? '1:81201229438:android:ff5209b746d89918b3322f' : _fbAndroidEnv;
   static const _fbIos = String.fromEnvironment('FB_APP_ID_CENTER_IOS');
 
   static Future<void> _initFirebase() async {
