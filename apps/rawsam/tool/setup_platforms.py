@@ -47,6 +47,160 @@ class CrashApp : Application() {
 '''
 
 
+LAUNCH_KT = r'''package {pkg}
+
+import android.app.Activity
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.os.Build
+import android.os.Bundle
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+import java.io.File
+import java.util.Date
+
+/**
+ * شاشة البداية الخفيفة: إذا التطبيق توقف بالمرة السابقة تعرض سبب التوقف (حتى لو التوقف صار قبل ما يشتغل Flutter)
+ * مع نسخ ومشاركة، وإلا تفتح التطبيق مباشرة.
+ */
+class LaunchActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val report = try { buildReport() } catch (e: Throwable) { null }
+        if (report.isNullOrBlank()) {
+            openMain()
+            return
+        }
+        showReport(report)
+    }
+
+    private fun openMain() {
+        val i = Intent(this, MainActivity::class.java)
+        i.action = intent?.action
+        i.data = intent?.data
+        intent?.extras?.let { i.putExtras(it) }
+        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        startActivity(i)
+        finish()
+        overridePendingTransition(0, 0)
+    }
+
+    private fun printable(bytes: ByteArray): String {
+        val out = StringBuilder()
+        val run = StringBuilder()
+        for (b in bytes) {
+            val c = b.toInt() and 0xff
+            if (c in 32..126 || c == 10) {
+                run.append(c.toChar())
+            } else {
+                if (run.length >= 5) out.append(run).append('\n')
+                run.setLength(0)
+            }
+        }
+        if (run.length >= 5) out.append(run)
+        return out.toString()
+    }
+
+    private fun buildReport(): String? {
+        val sb = StringBuilder()
+        val f = File(filesDir, "last_crash.txt")
+        if (f.exists()) {
+            sb.append(f.readText())
+            f.delete()
+        }
+        if (Build.VERSION.SDK_INT >= 30) {
+            val prefs = getSharedPreferences("crash_diag", MODE_PRIVATE)
+            val seen = prefs.getLong("seen", 0L)
+            var newest = seen
+            val am = getSystemService(ActivityManager::class.java)
+            for (info in am.getHistoricalProcessExitReasons(packageName, 0, 5)) {
+                if (info.timestamp <= seen) continue
+                if (info.timestamp > newest) newest = info.timestamp
+                val r = info.reason
+                if (r == ApplicationExitInfo.REASON_CRASH || r == ApplicationExitInfo.REASON_CRASH_NATIVE || r == ApplicationExitInfo.REASON_ANR) {
+                    val kind = when (r) {
+                        ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE CRASH"
+                        ApplicationExitInfo.REASON_ANR -> "ANR"
+                        else -> "JAVA CRASH"
+                    }
+                    sb.append("\n\n== $kind at ${Date(info.timestamp)}\n${info.description ?: ""}\n")
+                    if (r != ApplicationExitInfo.REASON_CRASH) {
+                        try {
+                            info.traceInputStream?.use { s ->
+                                val txt = printable(s.readBytes())
+                                sb.append(if (txt.length > 8000) txt.substring(0, 8000) else txt)
+                            }
+                        } catch (e: Throwable) {
+                        }
+                    }
+                }
+            }
+            prefs.edit().putLong("seen", newest).apply()
+        }
+        if (sb.isBlank()) return null
+        return "${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n$packageName\n" + sb
+    }
+
+    private fun showReport(report: String) {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.rgb(11, 16, 38))
+        root.setPadding(pad, pad * 2, pad, pad)
+
+        val title = TextView(this)
+        title.text = "التطبيق توقف بالمرة السابقة\nانسخ التقرير أو شاركه ودزه للمطوّر"
+        title.setTextColor(Color.WHITE)
+        title.textSize = 17f
+        title.gravity = Gravity.END
+        root.addView(title)
+
+        val scroll = ScrollView(this)
+        val body = TextView(this)
+        body.text = report
+        body.setTextColor(Color.rgb(200, 210, 235))
+        body.textSize = 11f
+        body.typeface = Typeface.MONOSPACE
+        body.setTextIsSelectable(true)
+        body.setPadding(0, pad, 0, pad)
+        scroll.addView(body)
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        fun button(label: String, action: () -> Unit) {
+            val b = Button(this)
+            b.text = label
+            b.isAllCaps = false
+            b.setOnClickListener { action() }
+            root.addView(b, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        button("نسخ التقرير") {
+            val cm = getSystemService(ClipboardManager::class.java)
+            cm.setPrimaryClip(ClipData.newPlainText("crash", report))
+            Toast.makeText(this, "انتسخ التقرير", Toast.LENGTH_SHORT).show()
+        }
+        button("مشاركة (تيليكرام / واتساب)") {
+            val s = Intent(Intent.ACTION_SEND)
+            s.type = "text/plain"
+            s.putExtra(Intent.EXTRA_TEXT, report)
+            startActivity(Intent.createChooser(s, "مشاركة التقرير"))
+        }
+        button("متابعة") { openMain() }
+        setContentView(root)
+    }
+}
+'''
+
+
 def fail(msg):
     print("✗ " + msg)
     sys.exit(1)
@@ -92,6 +246,13 @@ MANIFEST = """<manifest xmlns:android="http://schemas.android.com/apk/res/androi
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
+        </activity>
+        <!-- شاشة بداية خفيفة: تعرض سبب أي توقف سابق ثم تفتح التطبيق -->
+        <activity
+            android:name=".LaunchActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -172,6 +333,8 @@ def setup_android():
     os.makedirs(kt, exist_ok=True)
     with open(os.path.join(kt, "CrashApp.kt"), "w") as f:
         f.write(CRASH_KT.replace("{pkg}", APP_ID))
+    with open(os.path.join(kt, "LaunchActivity.kt"), "w") as f:
+        f.write(LAUNCH_KT.replace("{pkg}", APP_ID))
     res = os.path.join(main, "res")
     for folder in ("values", "values-ar"):
         os.makedirs(os.path.join(res, folder), exist_ok=True)
