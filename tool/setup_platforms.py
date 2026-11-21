@@ -220,6 +220,18 @@ class LaunchActivity : Activity() {
 '''
 
 
+PROGUARD_RULES = r'''# يمنع R8 من حذف الكلاسات اللي تنخلق بالانعكاس (Reflection)
+# WorkManager/Room: كان يسبب توقف التطبيق أول ما يفتح (WorkDatabase_Impl.<init>)
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.** { *; }
+-keep class androidx.room.** { *; }
+-dontwarn androidx.work.**
+-dontwarn androidx.room.**
+# عروض القرب
+-keep class com.chunkytofustudios.native_geofence.** { *; }
+'''
+
+
 def fail(msg):
     print("✗ " + msg)
     sys.exit(1)
@@ -367,6 +379,14 @@ def patch_gradle_kts(path):
             '    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n'
             '    implementation("androidx.appcompat:appcompat:1.7.1")\n'
             '}\n'
+        )
+    with open(os.path.join(os.path.dirname(path), "proguard-rules.pro"), "a") as f:
+        f.write(PROGUARD_RULES)
+    if "proguard-rules.pro" not in s:
+        s = s.replace(
+            'signingConfig = if (keystorePropertiesFile.exists())',
+            'proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")\n            signingConfig = if (keystorePropertiesFile.exists())',
+            1,
         )
     open(path, "w").write(s)
 
