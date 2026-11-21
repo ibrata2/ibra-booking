@@ -277,3 +277,24 @@ jobs:
             برمجة وتطوير ابراهيم الخزرجي — https://ibraprogram.netlify.app/
           files: dist/*
           make_latest: true
+
+      - name: روابط ثابتة (آخر نسخة دائماً)
+        run: |
+          mkdir -p fixed
+          for f in dist/*; do
+            n=$(basename "$f" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+-/-/')
+            cp "$f" "fixed/$n"
+          done
+          ls -la fixed
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: center-latest
+          name: "📅 حجوزات IBRA بكل نسخها — آخر نسخة (رابط ثابت)"
+          body: |
+            روابط ثابتة تتحدث تلقائياً لآخر نسخة.
+            - مواعيد المركز (مربوطة بروسم): IBRA-Center-android-universal.apk
+            - حجوزات IBRA (الفواتح): IBRA-BOOKING-android-universal.apk
+            - الحجوزات IBRA (العامة): IBRA-Bookings-General-android-universal.apk
+          files: fixed/*
+          make_latest: false

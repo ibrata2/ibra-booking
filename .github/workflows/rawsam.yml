@@ -252,3 +252,23 @@ jobs:
             برمجة وتطوير ابراهيم الخزرجي — https://ibraprogram.netlify.app/
           files: dist/*
           make_latest: false
+
+      - name: روابط ثابتة (آخر نسخة دائماً)
+        run: |
+          mkdir -p fixed
+          for f in dist/*; do
+            n=$(basename "$f" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+-/-/')
+            cp "$f" "fixed/$n"
+          done
+          ls -la fixed
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rawsam-latest
+          name: "🌸 روسم للتجميل — آخر نسخة (رابط ثابت)"
+          body: |
+            هذي الروابط ثابتة وتتحدث تلقائياً لآخر نسخة من تطبيق الزبائن «روسم للتجميل».
+            - أندرويد: Rawsam-android.apk
+            - آيفون: Rawsam-ios-unsigned.ipa
+          files: fixed/*
+          make_latest: false
