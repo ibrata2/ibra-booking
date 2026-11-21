@@ -164,6 +164,8 @@ def setup_android():
             fail("compileOptions غير موجود")
     s = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = maxOf(flutter.minSdkVersion, 24)", s)
     s = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = maxOf(flutter.compileSdkVersion, 37)", s)
+    # Google Play: أندرويد 16 (API 36) كحد أدنى للتطبيقات الجديدة
+    s = re.sub(r"targetSdk\s*=\s*flutter\.targetSdkVersion", "targetSdk = maxOf(flutter.targetSdkVersion, 36)", s)
     if "multiDexEnabled" not in s:
         s = re.sub(r"(defaultConfig\s*\{)", r"\1\n        multiDexEnabled = true", s, count=1)
     # فحص lint بنسخة الإصدار يتعطل على إضافات Firebase — نوقفه (ما يأثر على التطبيق)
@@ -213,6 +215,27 @@ def setup_android():
         text += "android.useAndroidX=true\n"
     open(props, "w").write(text)
     print("✓ Android → " + APP_ID)
+
+
+def write_privacy_manifest(ios, collected):
+    """App Store: ملف الخصوصية (Privacy Manifest) — يُضاف للمشروع في CI عبر xcodeproj."""
+    def item(t):
+        return {"NSPrivacyCollectedDataType": t, "NSPrivacyCollectedDataTypeLinked": True,
+                "NSPrivacyCollectedDataTypeTracking": False,
+                "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]}
+    data = {
+        "NSPrivacyTracking": False,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [item(t) for t in collected],
+        "NSPrivacyAccessedAPITypes": [
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults", "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp", "NSPrivacyAccessedAPITypeReasons": ["C617.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime", "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace", "NSPrivacyAccessedAPITypeReasons": ["E174.1"]},
+        ],
+    }
+    with open(os.path.join(ios, "Runner", "PrivacyInfo.xcprivacy"), "wb") as f:
+        plistlib.dump(data, f)
 
 
 def setup_ios():
@@ -271,6 +294,8 @@ def setup_ios():
                 t,
             )
         t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 15.0;", t)
+        # آيفون فقط (بدون آيباد) — ما يحتاج لقطات آيباد بمراجعة آبل
+        t = re.sub(r'TARGETED_DEVICE_FAMILY = "1,2";', "TARGETED_DEVICE_FAMILY = 1;", t)
         open(pbx, "w").write(t)
 
     sb = os.path.join(ios, "Runner", "Base.lproj", "LaunchScreen.storyboard")
@@ -288,6 +313,11 @@ def setup_ios():
         s = open(podfile).read()
         s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s, count=1)
         open(podfile, "w").write(s)
+    write_privacy_manifest(ios, [
+        "NSPrivacyCollectedDataTypeName", "NSPrivacyCollectedDataTypePhoneNumber",
+        "NSPrivacyCollectedDataTypePhotosorVideos", "NSPrivacyCollectedDataTypeOtherUserContent",
+        "NSPrivacyCollectedDataTypeDeviceID",
+    ])
     print("✓ iOS")
 
 

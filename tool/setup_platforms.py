@@ -132,6 +132,7 @@ def patch_gradle_kts(path):
     s = re.sub(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = maxOf(flutter.minSdkVersion, 24)", s)
     # flutter_local_notifications و androidx.core الحديثة تتطلب compileSdk 37
     s = re.sub(r"compileSdk\s*=\s*flutter\.compileSdkVersion", "compileSdk = maxOf(flutter.compileSdkVersion, 37)", s)
+    s = re.sub(r"targetSdk\s*=\s*flutter\.targetSdkVersion", "targetSdk = maxOf(flutter.targetSdkVersion, 36)", s)
     if "multiDexEnabled" not in s:
         s = re.sub(r"(defaultConfig\s*\{)", r"\1\n        multiDexEnabled = true", s, count=1)
     # فحص lint بنسخة الإصدار يتعطل على إضافات Firebase — نوقفه (ما يأثر على التطبيق)
@@ -215,6 +216,27 @@ def patch_gradle_groovy(path):
 
 # ---------------------------------------------------------------- iOS
 
+def write_privacy_manifest(ios, collected):
+    """App Store: ملف الخصوصية (Privacy Manifest) — يُضاف للمشروع في CI عبر xcodeproj."""
+    def item(t):
+        return {"NSPrivacyCollectedDataType": t, "NSPrivacyCollectedDataTypeLinked": True,
+                "NSPrivacyCollectedDataTypeTracking": False,
+                "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]}
+    data = {
+        "NSPrivacyTracking": False,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [item(t) for t in collected],
+        "NSPrivacyAccessedAPITypes": [
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults", "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp", "NSPrivacyAccessedAPITypeReasons": ["C617.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime", "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]},
+            {"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace", "NSPrivacyAccessedAPITypeReasons": ["E174.1"]},
+        ],
+    }
+    with open(os.path.join(ios, "Runner", "PrivacyInfo.xcprivacy"), "wb") as f:
+        plistlib.dump(data, f)
+
+
 def setup_ios():
     ios = os.path.join(ROOT, "ios")
     if not os.path.isdir(ios):
@@ -254,6 +276,7 @@ def setup_ios():
         if IOS_SUFFIX:
             t = re.sub(r"(PRODUCT_BUNDLE_IDENTIFIER = com\.ibraprogram\.)ibraBooking\b", r"\g<1>" + IOS_SUFFIX, t)
         t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 15.0;", t)
+        t = re.sub(r'TARGETED_DEVICE_FAMILY = "1,2";', "TARGETED_DEVICE_FAMILY = 1;", t)
         if CENTER and "CODE_SIGN_ENTITLEMENTS" not in t:
             # إشعارات رسائل الزبائن (Push)
             with open(os.path.join(ios, "Runner", "Runner.entitlements"), "wb") as f:
@@ -271,6 +294,9 @@ def setup_ios():
         # Firebase وماسح الباركود يحتاجون iOS 15
         s = re.sub(r"#?\s*platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s, count=1)
         open(podfile, "w").write(s)
+    write_privacy_manifest(ios, ["NSPrivacyCollectedDataTypeName", "NSPrivacyCollectedDataTypePhoneNumber",
+                                 "NSPrivacyCollectedDataTypeOtherUserContent", "NSPrivacyCollectedDataTypeDeviceID"]
+                           if CENTER else [])
     print("✓ iOS")
 
 

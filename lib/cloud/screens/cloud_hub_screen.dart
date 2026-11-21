@@ -94,6 +94,28 @@ class _Hub extends ConsumerWidget {
     return _Scaffold(
       title: 'تطبيق الزبائن',
       actions: [
+        PopupMenuButton<String>(
+          onSelected: (v) async {
+            if (v != 'delete') return;
+            final ok = await confirmDialog(
+              context,
+              title: 'حذف حسابي',
+              message: 'ينحذف حساب ${me.name} نهائياً ويطلع من تطبيق الزبائن. الحجوزات بالجهاز تبقى. هذا الإجراء ما يرجع.',
+              ok: 'احذف',
+              danger: true,
+            );
+            if (!ok) return;
+            try {
+              await Cloud.db.rpc('delete_my_account');
+              await Cloud.signOut();
+              ref.read(cloudSessionProvider.notifier).bump();
+              if (context.mounted) toast(context, 'انحذف الحساب');
+            } catch (e) {
+              if (context.mounted) toast(context, 'ما انحذف: $e');
+            }
+          },
+          itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('حذف حسابي'))],
+        ),
         IconButton(
           tooltip: 'تسجيل خروج',
           onPressed: () async {

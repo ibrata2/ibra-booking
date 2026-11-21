@@ -15,7 +15,10 @@
 | إيقاف إشعارات العروض | المزيد ← الإشعارات والعروض |
 | Android 16 (API 36) | يبني بأحدث Flutter و SDK 37 |
 | Xcode 26 / iOS 26 SDK | البناء على `macos-15` بأحدث Xcode |
-| بدون تحديث ذاتي بنسخة المتاجر | نسخة `store` ما تعرض تنبيه تنزيل APK |
+| بدون تحديث ذاتي بنسخة المتاجر | نسخة `store` ما تعرض تنبيه تنزيل APK، ولا تطلب صلاحية تنصيب تطبيقات |
+| مكتبات أصلية بمحاذاة 16KB (شرط Play) | تم الفحص على ملف APK: كلها 16KB أو 64KB |
+| Privacy Manifest لآبل | `PrivacyInfo.xcprivacy` ينضاف تلقائياً للمشروع بالبناء |
+| آيفون فقط | بدون آيباد، فما تحتاج لقطات آيباد |
 
 ## Google Play
 
@@ -29,6 +32,7 @@
 - **Background location declaration** (النص المقترح):
   > The app shows customers a special in-store discount when they pass near our beauty center. It registers a single geofence around the center using the OS geofencing API; the location never leaves the device. This feature is opt-in, explained before the permission request, and can be turned off at any time.
   - فيديو قصير (30 ثانية): افتح التطبيق ← المزيد ← الإشعارات والعروض ← «فعّل عروض القرب» ← شاشة الشرح ← اختيار «السماح طوال الوقت» ← وصول إشعار «مدام صرت قريب…».
+- **Foreground service (Location):** Play يطلب تصريح لنوع الخدمة `location` (من مكتبة Geofence). بنموذج **App content ← Foreground service permissions** اختار **Location** وارفع نفس فيديو عروض القرب.
 - **التصنيف العمري:** 18+ (خدمات تاتو وبيرسنك).
 - **الفئة:** Beauty / الجمال.
 
@@ -54,3 +58,18 @@
 • هداياي: خصومات خاصة بيك بكود وباركود تراويه بالمركز.
 • عروض القرب: من تمر قريب منا يوصلك عرض خاص (اختياري).
 • وصّلني: الطريق للمركز ويا صوت توجيه لحد الباب.
+
+
+---
+
+# نسخة المركز «مواعيد المركز IBRA» والنسختين الثانيتين
+
+| الشرط | الحالة |
+|---|---|
+| حذف حساب الموظف من داخل التطبيق | تطبيق الزبائن ← ⋮ ← حذف حسابي |
+| `SCHEDULE_EXACT_ALARM` | تصريح بنموذج Play: «تطبيق حجوزات وتقويم يرن بموعد الحجز بالضبط» |
+| `USE_FULL_SCREEN_INTENT` | تصريح: «منبه الحجز يرن بملء الشاشة لحد ما يستلمه المستخدم» (فئة Alarm). إذا رفضوه، التطبيق يشتغل بدونه بإشعار عادي |
+| `READ_CONTACTS` و `RECORD_AUDIO` | تُطلب بس وقت استيراد زبون أو تسجيل صوت تنبيه، ومذكورة بسلامة البيانات |
+| `CAMERA` (المركز فقط) | لمسح كوبونات الزبائن |
+| آبل: تطبيق داخلي لموظفي مركز واحد | آبل ممكن تطلب نشره كـ **Unlisted App** (رابط مباشر بدون ما يطلع بالبحث). اطلبه من https://developer.apple.com/contact/request/unlisted-app/ |
+| ملاحظة للمراجع (المركز) | أعطهم إيميل وكلمة سر موظف تجريبي حتى يدخلون قسم «تطبيق الزبائن» |

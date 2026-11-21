@@ -163,6 +163,20 @@ jobs:
           python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
           python3 tool/setup_platforms.py
 
+      - name: إضافة ملف الخصوصية لمشروع Xcode (App Store)
+        run: |
+          gem list -i xcodeproj >/dev/null || sudo gem install xcodeproj --no-document
+          ruby -e '
+            require "xcodeproj"
+            p = Xcodeproj::Project.open("ios/Runner.xcodeproj")
+            t = p.targets.find { |x| x.name == "Runner" }
+            g = p.main_group["Runner"]
+            unless g.files.any? { |f| f.path == "PrivacyInfo.xcprivacy" }
+              t.add_resources([g.new_reference("PrivacyInfo.xcprivacy")])
+              p.save
+            end
+            puts "✓ PrivacyInfo.xcprivacy"'
+
       - run: flutter pub get
 
       - name: إعدادات الربط
