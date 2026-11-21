@@ -80,7 +80,7 @@ class _ProximityPermissionCardState extends ConsumerState<ProximityPermissionCar
         content: const Text(
           'حتى يوصلك العرض من تمر قريب من المركز، راح يطلب منك الجهاز صلاحية الموقع.\n\n'
           'اختار «السماح طوال الوقت» حتى تشتغل والتطبيق مسدود.\n\n'
-          'موقعك ما يوصلنا ولا ننحفظه — الجهاز نفسه يعرف إذا دخلت منطقة المركز، ويوصلك العرض.',
+          'ما نحفظ موقعك بالضبط — بس منطقتك التقريبية (الكرادة / بغداد) وبعدك عن المركز بالكيلو، حتى توصلك العروض اللي تخص منطقتك.',
           style: TextStyle(height: 1.6),
         ),
         actions: [
@@ -113,6 +113,7 @@ class _ProximityPermissionCardState extends ConsumerState<ProximityPermissionCar
         await ProximityService.cacheOffer(c);
         final ok = await ProximityService.enable(c);
         await ref.read(profileProvider.notifier).save(ref.read(profileProvider).copyWith(proximityOn: ok));
+        await AreaService.update(ref.read(repoProvider), c, force: true);
         if (mounted && ok) toast(context, 'تم تفعيل عروض القرب 🎁');
       }
       if (mounted) setState(() => _status = s);
@@ -128,7 +129,7 @@ class _ProximityPermissionCardState extends ConsumerState<ProximityPermissionCar
       icon: Icons.near_me_rounded,
       color: Brand.gold,
       title: 'عروض القرب',
-      text: 'من تمر قريب من مركز روسم يوصلك عرض خاص بيك، مثل خصم 10% إذا مريت علينا.',
+      text: 'من تمر قريب من مركز روسم يوصلك عرض خاص بيك، مثل خصم 10% إذا مريت علينا، وعروض تخص منطقتك.',
       done: on,
       doneText: 'مفعّلة ✓',
       button: _busy ? 'لحظة…' : 'فعّل عروض القرب',

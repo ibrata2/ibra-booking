@@ -5,6 +5,7 @@ import '../../core/time/time_format.dart';
 import '../../presentation/widgets/common.dart';
 import '../cloud.dart';
 import '../cloud_providers.dart';
+import '../widgets/audience_picker.dart';
 
 /// العروض: عرض القرب (يوصل من يمر الزبون قريب) وعرض عام (ترسله بنفسك).
 /// كل عرض يوصل للزبون مرة وحدة بس، وتحدد منو يستلمه ومنو لا.
@@ -57,14 +58,7 @@ class OffersScreen extends ConsumerWidget {
   }
 }
 
-String audienceLabel(CRow o) {
-  final n = ((o['target_ids'] as List?) ?? const []).length;
-  return switch (o['audience']) {
-    'only' => '👥 بس $n زبون محدد',
-    'except' => '👥 الكل ماعدا $n',
-    _ => '👥 كل الزبائن',
-  };
-}
+String audienceLabel(CRow o) => '👥 ${Audience.fromRow(o).label}';
 
 class _OfferTile extends StatelessWidget {
   const _OfferTile({required this.o, required this.stat, required this.onChanged});
@@ -213,7 +207,7 @@ class _OfferRecipientsScreenState extends State<OfferRecipientsScreen> {
                 Glass(
                   child: Row(
                     children: [
-                      Expanded(child: Text('استلمه ${got.length} — ينتظر ${waiting.length} — مستثنى ${blocked.length}')),
+                      Expanded(child: Text('استلمه ${got.length} — ينتظر ${waiting.length} — ما يشملهم ${blocked.length}')),
                       if (widget.offer['active'] == true && waiting.isNotEmpty)
                         FilledButton.icon(
                           onPressed: () => sendOfferNow(context, widget.offer, () => setState(() => _rows = _load())),
@@ -228,7 +222,7 @@ class _OfferRecipientsScreenState extends State<OfferRecipientsScreen> {
                 SectionTitle('ما استلموه بعد (${waiting.length})'),
                 for (final r in waiting) row(r, '⏳'),
                 if (blocked.isNotEmpty) ...[
-                  SectionTitle('مستثنين من هالعرض (${blocked.length})'),
+                  SectionTitle('ما يشملهم العرض (${blocked.length})'),
                   for (final r in blocked) row(r, '🚫'),
                 ],
               ],
@@ -352,10 +346,8 @@ class _OfferEditorState extends ConsumerState<OfferEditor> {
   late final _title = TextEditingController(text: widget.offer?['title'] as String? ?? 'مدام صرت قريب على روسم… مر علينا 🌸');
   late final _discount = TextEditingController(text: widget.offer?['discount_text'] as String? ?? 'خصم 10%');
   late final _body = TextEditingController(text: widget.offer?['body'] as String? ?? '');
-  late String _audience = widget.offer?['audience'] as String? ?? 'all';
-  late final Set<String> _targets = {...((widget.offer?['target_ids'] as List?) ?? const []).map((e) => '$e')};
+  late Audience _aud = Audience.fromRow(widget.offer);
   late int _valid = (widget.offer?['valid_days'] as num?)?.toInt() ?? 3;
-  String _search = '';
   bool _busy = false;
 
   bool get _editing => widget.offer != null;
@@ -370,7 +362,7 @@ class _OfferEditorState extends ConsumerState<OfferEditor> {
 
   Future<void> _save() async {
     if (_title.text.trim().isEmpty) return;
-    if (_audience != 'all' && _targets.isEmpty) {
+    if (!_aud.valid) {
       toast(context, 'اختار الزبائن من القائمة');
       return;
     }
@@ -380,8 +372,7 @@ class _OfferEditorState extends ConsumerState<OfferEditor> {
       'title': _title.text.trim(),
       'discount_text': _discount.text.trim(),
       'body': _body.text.trim(),
-      'audience': _audience,
-      'target_ids': _audience == 'all' ? <String>[] : _targets.toList(),
+      ..._aud.toRow(),
       'valid_days': _valid,
       'sound': 'rs_gift',
     };
@@ -401,11 +392,6 @@ class _OfferEditorState extends ConsumerState<OfferEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final customers = (ref.watch(cloudCustomersProvider).value ?? const <String, CRow>{}).values
-        .where((c) => (c['name'] as String? ?? '').isNotEmpty)
-        .where((c) => _search.isEmpty || '${c['name']} ${c['phone']}'.contains(_search))
-        .toList()
-      ..sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
     return Scaffold(
       appBar: AppBar(title: Text(_editing ? 'تعديل العرض' : 'عرض جديد')),
       body: AppBackground(
@@ -450,43 +436,7 @@ class _OfferEditorState extends ConsumerState<OfferEditor> {
               onChanged: (v) => setState(() => _valid = v ?? 7),
             ),
             const SectionTitle('منو يستلم العرض'),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'all', label: Text('الكل')),
-                ButtonSegment(value: 'only', label: Text('بس المحددين')),
-                ButtonSegment(value: 'except', label: Text('الكل ماعدا')),
-              ],
-              selected: {_audience},
-              onSelectionChanged: (s) => setState(() => _audience = s.first),
-            ),
-            if (_audience != 'all') ...[
-              const SizedBox(height: 10),
-              TextField(
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'ابحث بالاسم أو الرقم'),
-                onChanged: (v) => setState(() => _search = v.trim()),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${_audience == 'only' ? 'المحددين يستلمون' : 'المحددين ما يستلمون'} — مختار ${_targets.length}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              Glass(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    if (customers.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('ماكو زبائن بعد')),
-                    for (final c in customers)
-                      CheckboxListTile(
-                        dense: true,
-                        value: _targets.contains(c['id']),
-                        title: Text(c['name'] as String),
-                        subtitle: Text(c['phone'] as String? ?? '', textDirection: TextDirection.ltr, textAlign: TextAlign.end),
-                        onChanged: (v) => setState(() => v == true ? _targets.add(c['id'] as String) : _targets.remove(c['id'])),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+            AudiencePicker(value: _aud, onChanged: (v) => setState(() => _aud = v)),
             const SizedBox(height: 20),
             FilledButton(onPressed: _busy ? null : _save, child: Text(_editing ? 'حفظ التعديل' : 'حفظ العرض')),
           ],

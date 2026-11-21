@@ -167,6 +167,13 @@ class SupabaseCenterRepository implements CenterRepository {
   }
 
   @override
+  Future<void> updateArea(String area, double distKm) async {
+    try {
+      await _db.rpc('update_my_area', params: {'p_area': area, 'p_dist': distKm});
+    } catch (_) {}
+  }
+
+  @override
   Future<void> registerPushToken(String token, String platform) async {
     try {
       await _db.rpc('register_token', params: {'p_token': token, 'p_kind': 'customer', 'p_platform': platform});

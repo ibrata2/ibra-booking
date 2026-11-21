@@ -177,6 +177,9 @@ class DemoCenterRepository implements CenterRepository {
   }
 
   @override
+  Future<void> updateArea(String area, double distKm) async {}
+
+  @override
   Future<void> registerPushToken(String token, String platform) async {}
 
   @override

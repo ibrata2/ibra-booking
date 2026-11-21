@@ -26,11 +26,11 @@
 - **الحساب الشخصي الجديد:** اختبار مغلق بـ 12 مختبِر على الأقل لمدة 14 يوم متواصل قبل النشر.
 - **Data safety:**
   - يجمع: الاسم، رقم الهاتف، الرسائل، الصور (اختياري)، معرّفات الجهاز (رمز الإشعارات).
-  - ما يجمع الموقع (يُستخدم على الجهاز فقط ولا يُرسل) — جاوب «لا يُجمع» للموقع.
+  - **الموقع التقريبي (Approximate location):** يُجمع — الغرض: App functionality و Advertising or marketing (عروض حسب المنطقة). اختياري. الموقع الدقيق ما يُجمع.
   - البيانات مشفّرة أثناء النقل: نعم. يقدر يطلب الحذف: نعم (من التطبيق + رابط الويب).
   - ما تُشارك مع طرف ثالث لأغراض إعلانية.
 - **Background location declaration** (النص المقترح):
-  > The app shows customers a special in-store discount when they pass near our beauty center. It registers a single geofence around the center using the OS geofencing API; the location never leaves the device. This feature is opt-in, explained before the permission request, and can be turned off at any time.
+  > The app shows customers a special in-store discount when they pass near our beauty center. It registers a single geofence around the center using the OS geofencing API. Precise coordinates never leave the device; only an approximate area (district/city) and rounded distance to the center are stored to send area-relevant offers. The feature is opt-in, explained before the permission request, and can be turned off at any time.
   - فيديو قصير (30 ثانية): افتح التطبيق ← المزيد ← الإشعارات والعروض ← «فعّل عروض القرب» ← شاشة الشرح ← اختيار «السماح طوال الوقت» ← وصول إشعار «مدام صرت قريب…».
 - **Foreground service (Location):** Play يطلب تصريح لنوع الخدمة `location` (من مكتبة Geofence). بنموذج **App content ← Foreground service permissions** اختار **Location** وارفع نفس فيديو عروض القرب.
 - **التصنيف العمري:** 18+ (خدمات تاتو وبيرسنك).
@@ -40,7 +40,7 @@
 
 - **البناء:** `Rawsam-*-ios-xcode-project.zip` ← افتحه بـ Xcode على ماك أو بخدمة بناء سحابية ← Archive ← Upload.
 - **Capabilities:** Push Notifications، و Background Modes → Remote notifications.
-- **App Privacy:** Contact Info (Name, Phone) و User Content (Messages, Photos) و Identifiers (Device ID) — مرتبطة بالمستخدم، ما تُستخدم للتتبع.
+- **App Privacy:** Contact Info (Name, Phone) و User Content (Messages, Photos) و Identifiers (Device ID) و Coarse Location — مرتبطة بالمستخدم، ما تُستخدم للتتبع.
 - **ملاحظات للمراجع (Review Notes):**
   > Customers sign in anonymously; no password is needed. Enter any name and phone on first launch. Chat with the center from the "احجز" tab — a staff member replies and confirms bookings. "Nearby offers" are optional and use region monitoring around the center; location never leaves the device. Account deletion: More → حذف حسابي وبياناتي.
 - **لقطات الشاشة:** 6.9 إنج (1320×2868) و 6.5 إنج — الرئيسية، أعمالنا، المحادثة، هداياي، وصّلني.

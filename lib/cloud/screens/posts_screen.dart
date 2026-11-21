@@ -10,6 +10,7 @@ import '../../services/file_helper.dart';
 import '../cloud.dart';
 import '../cloud_providers.dart';
 import 'cloud_hub_screen.dart';
+import '../widgets/audience_picker.dart';
 
 /// المنشورات والعروض: تلصق رابط منشور انستا/فيس (أو تكتب عرض) → يطلع بالتطبيق ويوصل إشعار بصوت مميز.
 class PostsScreen extends ConsumerWidget {
@@ -109,6 +110,7 @@ class _PostEditorState extends State<PostEditor> {
   int _expiresDays = 0;
   String? _imagePath;
   bool _busy = false;
+  Audience _aud = const Audience();
 
   @override
   void dispose() {
@@ -132,6 +134,10 @@ class _PostEditorState extends State<PostEditor> {
       toast(context, 'الصق رابط المنشور أو اكتب عنوان');
       return;
     }
+    if (!_aud.valid) {
+      toast(context, 'اختار الزبائن من القائمة');
+      return;
+    }
     setState(() => _busy = true);
     try {
       String? image;
@@ -148,9 +154,10 @@ class _PostEditorState extends State<PostEditor> {
         'pinned': _pinned,
         'expires_at': _expiresDays == 0 ? null : DateTime.now().add(Duration(days: _expiresDays)).toUtc().toIso8601String(),
         'created_by': Cloud.user?.id,
+        ..._aud.toRow(),
       });
       if (mounted) {
-        toast(context, _notify ? 'انتشر ووصل إشعار للزبائن ✓' : 'انتشر ✓');
+        toast(context, _notify ? 'انتشر ووصل إشعار لـ ${_aud.label} ✓' : 'انتشر ✓');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -231,7 +238,16 @@ class _PostEditorState extends State<PostEditor> {
             ],
             onChanged: (v) => setState(() => _expiresDays = v ?? 0),
           ),
-          SwitchListTile(value: _notify, onChanged: (v) => setState(() => _notify = v), title: const Text('أرسل إشعار لكل الزبائن')),
+          SwitchListTile(value: _notify, onChanged: (v) => setState(() => _notify = v), title: const Text('أرسل إشعار')),
+          if (_notify) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+              child: Text('منو يوصله الإشعار', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            AudiencePicker(value: _aud, onChanged: (v) => setState(() => _aud = v)),
+            const SizedBox(height: 4),
+            Text('المنشور نفسه يطلع بالتطبيق للكل، والإشعار يوصل بس للي اخترتهم.', style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+          ],
           SwitchListTile(value: _pinned, onChanged: (v) => setState(() => _pinned = v), title: const Text('تثبيت بأعلى الصفحة')),
           const SizedBox(height: 10),
           FilledButton.icon(

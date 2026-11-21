@@ -107,13 +107,23 @@ async function handle(table: string, op: string, r: Record<string, any>) {
     case "posts": {
       if (op !== "INSERT" || !r.notify) return;
       const isOffer = r.kind === "offer";
-      await send({ topic: CUSTOMERS_TOPIC }, {
+      const note: Note = {
         title: r.title || (isOffer ? `عرض جديد من ${CENTER} 🎁` : `${CENTER} نشرت شي جديد ✨`),
         body: cut(r.body || "اضغط حتى تشوف المنشور"),
         sound: r.sound || (isOffer ? "rs_offer" : "rs_post"),
         image: r.image_url,
         data: { type: "post", id: String(r.id) },
-      });
+      };
+      if (!r.audience || r.audience === "all") {
+        await send({ topic: CUSTOMERS_TOPIC }, note);
+      } else {
+        // حسب المنطقة: القريبين / الكرادة / بغداد / محددين
+        const { data: ids } = await sb.rpc("audience_customer_ids", {
+          aud: r.audience, targets: r.target_ids ?? [], near: r.near_km ?? 2,
+        });
+        const list = (ids ?? []).map((x: any) => (typeof x === "string" ? x : x.audience_customer_ids));
+        for (const uid of list) await sendToUser(uid, "customer", note);
+      }
       return;
     }
     case "messages": {

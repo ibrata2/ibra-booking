@@ -131,3 +131,34 @@ class ProximityService {
     }
   }
 }
+
+/// منطقة الزبون التقريبية: تنحسب بالجهاز كل ما يفتح التطبيق (إذا مفعّل الموقع)،
+/// وينرسل للمركز بس: الكرادة / بغداد / خارج بغداد + البعد عن المركز مقرّب لنص كيلو.
+/// حتى المركز يكدر يرسل إشعار للقريبين أو لأهل الكرادة أو لبغداد بس.
+class AreaService {
+  AreaService._();
+  static const _kAt = 'area_sent_ms';
+  static const _karradaLat = 33.3050, _karradaLng = 44.4260, _karradaKm = 3.5;
+  static const _baghdadLat = 33.3152, _baghdadLng = 44.3661, _baghdadKm = 30.0;
+
+  static Future<void> update(CenterRepository repo, CenterInfo c, {bool force = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getInt(_kAt) ?? 0;
+      if (!force && DateTime.now().millisecondsSinceEpoch - last < const Duration(minutes: 30).inMilliseconds) return;
+      final p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied || p == LocationPermission.deniedForever) return;
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      final pos = await Geolocator.getLastKnownPosition() ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 15)),
+          );
+      final km = Geolocator.distanceBetween(pos.latitude, pos.longitude, c.lat, c.lng) / 1000;
+      final kar = Geolocator.distanceBetween(pos.latitude, pos.longitude, _karradaLat, _karradaLng) / 1000;
+      final bag = Geolocator.distanceBetween(pos.latitude, pos.longitude, _baghdadLat, _baghdadLng) / 1000;
+      final area = kar <= _karradaKm ? 'karrada' : (bag <= _baghdadKm ? 'baghdad' : 'outside');
+      await repo.updateArea(area, km);
+      await prefs.setInt(_kAt, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+}

@@ -42,6 +42,7 @@ class _ShellState extends ConsumerState<Shell> with WidgetsBindingObserver {
       PushService.launchTap = null;
       if (launch != null) _onTap(launch);
       await _claimProximity();
+      await AreaService.update(repo, centerOf(ref));
     });
   }
 
@@ -56,7 +57,10 @@ class _ShellState extends ConsumerState<Shell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _claimProximity();
+    if (state == AppLifecycleState.resumed) {
+      _claimProximity();
+      AreaService.update(ref.read(repoProvider), ref.read(centerInfoProvider).value ?? const CenterInfo());
+    }
   }
 
   Future<void> _claimProximity() async {

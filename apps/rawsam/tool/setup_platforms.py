@@ -38,7 +38,7 @@ MANIFEST = """<manifest xmlns:android="http://schemas.android.com/apk/res/androi
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- عروض القرب (دائرة المركز) — الموقع لا يُرسل لأي جهة -->
+    <!-- عروض القرب والعروض حسب المنطقة — تُحفظ المنطقة التقريبية فقط -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
@@ -249,8 +249,8 @@ def setup_ios():
     pl["CFBundleName"] = "Rawsam"
     pl["CFBundleDevelopmentRegion"] = "ar"
     pl["CFBundleLocalizations"] = ["ar", "en"]
-    pl["NSLocationWhenInUseUsageDescription"] = "حتى نعرف إذا أنت قريب من المركز ونوصلك عروض القرب، أو نحدد إذا بيتك قريب من المركز. موقعك ما ينرسل لأي جهة."
-    pl["NSLocationAlwaysAndWhenInUseUsageDescription"] = "حتى يوصلك عرض خاص من تمر قريب من مركز روسم حتى والتطبيق مسدود. الجهاز نفسه يعرف إذا دخلت منطقة المركز، وموقعك ما ينرسل لأي جهة."
+    pl["NSLocationWhenInUseUsageDescription"] = "حتى توصلك عروض القرب والعروض اللي تخص منطقتك. نحفظ بس منطقتك التقريبية (الكرادة / بغداد) وبعدك عن المركز، مو موقعك بالضبط."
+    pl["NSLocationAlwaysAndWhenInUseUsageDescription"] = "حتى يوصلك عرض خاص من تمر قريب من مركز روسم حتى والتطبيق مسدود. نحفظ بس منطقتك التقريبية وبعدك عن المركز، مو موقعك بالضبط."
     pl["NSLocationAlwaysUsageDescription"] = pl["NSLocationAlwaysAndWhenInUseUsageDescription"]
     pl["NSCameraUsageDescription"] = "حتى تصور وترسل صورة للمركز بالمحادثة (مثلاً تصميم التاتو اللي تريده)."
     pl["NSPhotoLibraryUsageDescription"] = "حتى تختار صورة وترسلها للمركز بالمحادثة."
@@ -316,7 +316,7 @@ def setup_ios():
     write_privacy_manifest(ios, [
         "NSPrivacyCollectedDataTypeName", "NSPrivacyCollectedDataTypePhoneNumber",
         "NSPrivacyCollectedDataTypePhotosorVideos", "NSPrivacyCollectedDataTypeOtherUserContent",
-        "NSPrivacyCollectedDataTypeDeviceID",
+        "NSPrivacyCollectedDataTypeDeviceID", "NSPrivacyCollectedDataTypeCoarseLocation",
     ])
     print("✓ iOS")
 

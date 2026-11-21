@@ -32,6 +32,9 @@ abstract class CenterRepository {
   /// عرض القرب: يُطلب بعد دخول دائرة المركز. يعيد الكوبون الجديد أو null.
   Future<Coupon?> claimProximity();
 
+  /// المنطقة التقريبية فقط (الكرادة / بغداد / خارج) والبعد عن المركز — بدون إحداثيات.
+  Future<void> updateArea(String area, double distKm);
+
   Future<void> registerPushToken(String token, String platform);
   Future<void> deleteAccount();
 }
