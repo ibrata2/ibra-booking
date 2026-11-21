@@ -544,6 +544,12 @@ create policy rs_bookings_staff on public.bookings for all using (is_staff()) wi
 create policy rs_coupons_read on public.coupons for select using (customer_id = auth.uid() or is_staff());
 create policy rs_coupons_staff on public.coupons for all using (is_staff()) with check (is_staff());
 
+-- صلاحيات الجداول للتطبيقات (الحماية الفعلية بسياسات RLS فوق)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on public.center_settings, public.mall_steps, public.public_services, public.posts, public.works to anon;
+grant usage, select on all sequences in schema public to authenticated;
+
 -- السماح بالتنفيذ
 grant execute on function public.upsert_customer(text,text,text,int) to authenticated;
 grant execute on function public.register_token(text,text,text) to authenticated;
