@@ -12,6 +12,10 @@ import 'notifications.dart';
 class PushService {
   PushService._();
   static bool _ready = false;
+
+  /// true لما الجهاز مسجل بإشعارات Firebase فعلاً. آيفون بدون مفتاح APNs (توقيع شخصي) يبقى false،
+  /// فالتطبيق يعرض الإشعارات بنفسه وهو شغال.
+  static bool hasToken = false;
   static final _taps = StreamController<NotificationTap>.broadcast();
   static Stream<NotificationTap> get taps => _taps.stream;
   static NotificationTap? launchTap;
@@ -67,7 +71,10 @@ class PushService {
         }
       }
       final token = await m.getToken();
-      if (token != null) await repo.registerPushToken(token, Platform.operatingSystem);
+      if (token != null) {
+        hasToken = true;
+        await repo.registerPushToken(token, Platform.operatingSystem);
+      }
       m.onTokenRefresh.listen((t) => repo.registerPushToken(t, Platform.operatingSystem));
       await setPromos(promos);
     } catch (_) {}

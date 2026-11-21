@@ -80,6 +80,7 @@ class Post {
   final String body;
   final String? imageUrl;
   final bool pinned;
+  final bool notify;
   final DateTime createdAt;
   final DateTime? expiresAt;
 
@@ -92,6 +93,7 @@ class Post {
     this.body = '',
     this.imageUrl,
     this.pinned = false,
+    this.notify = true,
     required this.createdAt,
     this.expiresAt,
   });
@@ -108,6 +110,7 @@ class Post {
     body: _s(j['body']),
     imageUrl: j['image_url'] as String?,
     pinned: j['pinned'] == true,
+    notify: j['notify'] != false,
     createdAt: _dt(j['created_at']),
     expiresAt: _dtn(j['expires_at']),
   );

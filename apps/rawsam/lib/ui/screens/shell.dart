@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../data/models.dart';
+import '../../services/live_alerts.dart';
 import '../../services/notifications.dart';
 import '../../services/proximity.dart';
 import '../../services/push.dart';
@@ -90,6 +91,19 @@ class _ShellState extends ConsumerState<Shell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // إشعارات من داخل التطبيق (للآيفون بدون APNs، أو إذا Firebase ما اشتغل)
+    ref.listen<AsyncValue<List<Coupon>>>(couponsProvider, (_, n) {
+      final v = n.value;
+      if (v != null) LiveAlerts.coupons(v);
+    });
+    ref.listen<AsyncValue<List<Post>>>(postsProvider, (_, n) {
+      final v = n.value;
+      if (v != null) LiveAlerts.posts(v);
+    });
+    ref.listen<AsyncValue<List<ChatMessage>>>(messagesProvider, (_, n) {
+      final v = n.value;
+      if (v != null) LiveAlerts.messages(v, chatOpen: ref.read(tabProvider) == Tabs.chat);
+    });
     // تذكير الزبون بمواعيده كلما تغيرت
     ref.listen<AsyncValue<List<Booking>>>(bookingsProvider, (_, next) {
       final list = next.value;
