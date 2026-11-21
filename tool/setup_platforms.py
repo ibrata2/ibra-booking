@@ -37,6 +37,35 @@ NAME_AR = {"general": "الحجوزات IBRA", "center": "مواعيد المر�
 NAME_EN = {"general": "IBRA Bookings", "center": "IBRA Center"}.get(EDITION, "IBRA BOOKING")
 
 
+CRASH_KT = r'''package {pkg}
+
+import android.app.Application
+import android.content.Context
+import android.os.Build
+import android.util.Log
+import java.io.File
+import java.util.Date
+
+/** يسجل سبب أي توقف مفاجئ بملف حتى يطلع للمستخدم بالمرة الجاية ويكدر يدزه للمطوّر. */
+class CrashApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            try {
+                File(base.filesDir, "last_crash.txt").writeText(
+                    "${Date()}\n${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n" +
+                        "thread: ${thread.name}\n\n" + Log.getStackTraceString(error)
+                )
+            } catch (ignored: Throwable) {
+            }
+            previous?.uncaughtException(thread, error)
+        }
+    }
+}
+'''
+
+
 def fail(msg):
     print("✗ " + msg)
     sys.exit(1)
@@ -91,6 +120,8 @@ def setup_android():
             if os.path.exists(p):
                 os.remove(p)
     os.makedirs(kt_dir, exist_ok=True)
+    with open(os.path.join(kt_dir, "CrashApp.kt"), "w") as f:
+        f.write(CRASH_KT.replace("{pkg}", PACKAGE))
     with open(os.path.join(kt_dir, "MainActivity.kt"), "w") as f:
         f.write(
             f"package {PACKAGE}\n\n"

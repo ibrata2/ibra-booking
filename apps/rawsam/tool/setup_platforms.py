@@ -18,6 +18,35 @@ APP_ID = "com.ibraprogram.rawsam"
 NAME = "روسم للتجميل"
 
 
+CRASH_KT = r'''package {pkg}
+
+import android.app.Application
+import android.content.Context
+import android.os.Build
+import android.util.Log
+import java.io.File
+import java.util.Date
+
+/** يسجل سبب أي توقف مفاجئ بملف حتى يطلع للمستخدم بالمرة الجاية ويكدر يدزه للمطوّر. */
+class CrashApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            try {
+                File(base.filesDir, "last_crash.txt").writeText(
+                    "${Date()}\n${Build.MANUFACTURER} ${Build.MODEL} — Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n" +
+                        "thread: ${thread.name}\n\n" + Log.getStackTraceString(error)
+                )
+            } catch (ignored: Throwable) {
+            }
+            previous?.uncaughtException(thread, error)
+        }
+    }
+}
+'''
+
+
 def fail(msg):
     print("✗ " + msg)
     sys.exit(1)
@@ -47,7 +76,7 @@ MANIFEST = """<manifest xmlns:android="http://schemas.android.com/apk/res/androi
 
     <application
         android:label="@string/app_name"
-        android:name="${applicationName}"
+        android:name=".CrashApp"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:networkSecurityConfig="@xml/network_security_config"
@@ -98,6 +127,8 @@ MANIFEST = """<manifest xmlns:android="http://schemas.android.com/apk/res/androi
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true" />
 
+        <!-- بعض موبايلات Mali (مثل Honor X6c) تتعطل ويا Vulkan — نستخدم الرسم المتوافق -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false" />
         <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
 
@@ -137,6 +168,10 @@ def setup_android():
     main = os.path.join(android, "app", "src", "main")
     with open(os.path.join(main, "AndroidManifest.xml"), "w") as f:
         f.write(MANIFEST)
+    kt = os.path.join(main, "kotlin", *APP_ID.split("."))
+    os.makedirs(kt, exist_ok=True)
+    with open(os.path.join(kt, "CrashApp.kt"), "w") as f:
+        f.write(CRASH_KT.replace("{pkg}", APP_ID))
     res = os.path.join(main, "res")
     for folder in ("values", "values-ar"):
         os.makedirs(os.path.join(res, folder), exist_ok=True)

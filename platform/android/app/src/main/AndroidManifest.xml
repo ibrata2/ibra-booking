@@ -15,7 +15,7 @@
 
     <application
         android:label="@string/app_name"
-        android:name="${applicationName}"
+        android:name=".CrashApp"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
@@ -52,6 +52,8 @@
         </receiver>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
 
+        <!-- بعض موبايلات Mali (مثل Honor X6c) تتعطل ويا Vulkan — نستخدم الرسم المتوافق -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

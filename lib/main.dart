@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/diag/crash_report.dart';
 import 'cloud/cloud.dart';
 import 'data/db/app_database.dart';
 import 'data/repositories/sqlite_repositories.dart';
@@ -17,6 +18,7 @@ import 'services/sound_service.dart';
 /// برمجة وتطوير ابراهيم الخزرجي
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await showLastCrashIfAny();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
 
   final db = await AppDatabase.open();

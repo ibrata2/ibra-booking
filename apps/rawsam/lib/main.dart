@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/crash_report.dart';
 import 'core/config.dart';
 import 'data/demo_repository.dart';
 import 'data/repository.dart';
@@ -19,6 +20,7 @@ import 'state.dart';
 /// برمجة وتطوير ابراهيم الخزرجي
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await showLastCrashIfAny();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light),
   );
