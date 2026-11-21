@@ -35,9 +35,10 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
         </activity>
-        <!-- شاشة بداية خفيفة: تعرض سبب أي توقف سابق ثم تفتح التطبيق -->
+        <!-- شاشة بداية خفيفة بعملية منفصلة: تعرض سبب أي توقف سابق (حتى لو التوقف صار أول ما يشتغل التطبيق) ثم تفتحه -->
         <activity
             android:name=".LaunchActivity"
+            android:process=":diag"
             android:exported="true"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
